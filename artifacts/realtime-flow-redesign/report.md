@@ -45,7 +45,7 @@ node --disable-warning=ExperimentalWarning --test tests/purity.test.ts
 
 根 `npm run test:quick` 实际执行，出现既存的 Windows ACP 权限/符号链接、缺少 codex 程序、备份权限与清理失败，随后没有正常结束；已停止本次测试进程树，不能记为通过。没有运行模拟、变异或发布流程，本批未修改内核、协议实现或调度。
 
-运行方式见 [启动步骤](../../docs/frontend-backend-startup.md)。依赖变化后先执行 `npm --prefix frontend ci`，再按原方式启动中台及前端。
+运行方式见 [启动步骤](../../docs/local/frontend-backend-startup.md)。依赖变化后先执行 `npm --prefix frontend ci`，再按原方式启动中台及前端。
 ## 收尾
 
 本轮浏览器、前端服务和临时中台已停止。临时目录 `C:/Users/EDY/AppData/Local/Temp/autoloop-browser-GdodHF` 仍存在；已核实其绝对路径后尝试 `Remove-Item -LiteralPath -Recurse -Force`，自动审批拒绝并仅返回 `blocked by policy`。未更换工具绕过，可手工清理这个本轮目录。

@@ -1,11 +1,13 @@
 # AI-OPS 只读端到端检查
 
+> 来源：本分支的本机验收记录（`2026-11-13`，提交 `2392e73`）。结果仅适用于文中环境，属于历史记录，本次整理未重新执行。 [文档索引](../README.md)。
+
 被测项目为 `D:\programs\ai\ai-ops`，在 `WSL` 中对应 `/mnt/d/programs/ai/ai-ops`。只检查页面，不修改业务代码、不安装或替换该项目的依赖，不对真实业务接口执行写操作。
 
 ## 配置位置
 
 - 中台规则：`/home/edy/.agent-autoloop-local/rules.json`。
-- 检查规则与 Agent：`AI-OPS 只读端到端检查`、`ai-ops-e2e`。
+- 检查规则与 `Agent`：`AI-OPS 只读端到端检查`、`ai-ops-e2e`。
 - 事件类型：`ai-ops.e2e`，来源：`local`。
 - 工作目录：`/mnt/d/programs/ai/ai-ops`。
 - 独立测试目录：`/home/edy/.agent-autoloop-local/checks/ai-ops-e2e`。
@@ -54,11 +56,11 @@ wsl -d Ubuntu -u edy -- bash /home/edy/.agent-autoloop-local/checks/ai-ops-e2e/t
 
 `2026-11-13` 已完成直接执行与中台事件派发验证，补装中文字体后再次通过。最近中台轮次 `#6` 为 `done`，记录“AI-OPS 只读端到端检查完成：6 项通过，0 项失败，0 项跳过”。
 
-WSL 中的测试运行器和 Linux 无头浏览器均已实际启动；被测页面复用的是 Windows 开发服务，并未将项目开发服务器迁移进 WSL。没有修改 `ai-ops` 的业务代码或包文件。
+`WSL` 中的测试运行器和 `Linux` 无头浏览器均已实际启动；被测页面复用的是 `Windows` 开发服务，并未将项目开发服务器迁移进 `WSL`。没有修改 `ai-ops` 的业务代码或包文件。
 
-- [本次 e2e 汇总](../output/ai-ops-e2e/summary.md)
-- [机器可读报告](../output/ai-ops-e2e/report.json)
-- [桌面连接表单截图](../output/ai-ops-e2e/results/readonly-signed-out-entry-shows-884946c9e87ba17e/attempt-1/screenshots/001-signed-out-login.png)
-- [窄屏问答截图](../output/ai-ops-e2e/results/readonly-390px-viewport-keeps-login-99a96a5fa725468b/attempt-1/screenshots/002-mobile-chat.png)
+- 本次 e2e 汇总：`output/ai-ops-e2e/summary.md`（当前检出未包含）
+- 机器可读报告：`output/ai-ops-e2e/report.json`（当前检出未包含）
+- 桌面连接表单截图：`output/ai-ops-e2e/results/readonly-signed-out-entry-shows-884946c9e87ba17e/attempt-1/screenshots/001-signed-out-login.png`（当前检出未包含）
+- 窄屏问答截图：`output/ai-ops-e2e/results/readonly-390px-viewport-keeps-login-99a96a5fa725468b/attempt-1/screenshots/002-mobile-chat.png`（当前检出未包含）
 
 这批测试验证了未登录与模拟过期登录的前端行为；真实账号登录、真实模型问答、上传、文档预览和图谱数据等业务流程，仍需专用测试账号和测试数据后再验收。

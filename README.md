@@ -248,6 +248,7 @@ Apple M5 Pro、24 GB、Node 24.21.0。写入逐条提交，事务落盘后才应
 
 ## 更多文档
 
+- [文档索引与来源分类](docs/README.md)
 - [安装说明](INSTALL.md)
 - [独立流程操作台](frontend/README.md)
 - [规则与交付流水线配置手册](skills/agent-autoloop/SKILL.md)

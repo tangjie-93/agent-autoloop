@@ -9,7 +9,7 @@ if [ -f "$HOME/.nvm/nvm.sh" ]; then
 fi
 cd "$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 if [ ! -f "$AGENT_AUTOLOOP_HOME/config.json" ]; then
-  echo '尚未初始化中台，请先按 docs/wsl2-deployment.md 完成初始化。' >&2
+  echo '尚未初始化中台，请先按 docs/local/wsl2-deployment.md 完成初始化。' >&2
   exit 1
 fi
 case "${1:-}" in

@@ -1,4 +1,6 @@
-# 本机 WSL2 部署验收记录
+# 本机 `WSL2` 部署验收记录
+
+> 来源：本分支的本机验收记录（`2026-11-13`，提交 `2392e73`）。结果仅适用于文中环境，属于历史记录，本次整理未重新执行。 [文档索引](../README.md)。
 
 部署日期：`2026-11-13`。
 
@@ -8,8 +10,8 @@
 | --- | --- |
 | 发行版与用户 | `Ubuntu / edy`，`WSL2` |
 | 仓库 | `/mnt/d/github/agent-autoloop` |
-| Node.js / npm | `v24.22.3 / 11.19.1` |
-| Codex CLI | `0.168.0`，位于 `/home/edy/.nvm/versions/node/v24.22.3/bin/codex` |
+| `Node.js` / npm | `v24.22.3 / 11.19.1` |
+| `Codex` CLI | `0.168.0`，位于 `/home/edy/.nvm/versions/node/v24.22.3/bin/codex` |
 | 中台 | `http://127.0.0.1:3350` |
 | 前端 | `http://127.0.0.1:5193` |
 | 数据目录 | `/home/edy/.agent-autoloop-local` |
@@ -57,4 +59,4 @@
 ## 相关文件
 
 - [部署与再次启动说明](wsl2-deployment.md)
-- [浏览器验收截图](../output/playwright/wsl-deployment.png)
+- 浏览器验收截图：`output/playwright/wsl-deployment.png`（当前检出未包含）
