@@ -250,6 +250,7 @@ For automated workloads, providers generally recommend using API keys rather tha
 
 ## Documentation
 
+- [Documentation index and provenance (Chinese)](docs/README.md)
 - [Installation guide](INSTALL.md)
 - [Standalone flow console](frontend/README.md)
 - [Configuration & delivery pipeline manual](skills/agent-autoloop/SKILL.md)

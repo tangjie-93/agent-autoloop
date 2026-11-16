@@ -1,6 +1,8 @@
-# 在 WSL2 中启动真实 Agent 和前端
+# 在 `WSL2` 中启动真实 `Agent` 和前端
 
-已完成本机 WSL 部署后，可直接双击仓库根目录的 `start.cmd`，自动检查并启动前后端、复制本人密钥并打开浏览器。详见[Windows 一键启动说明](one-click-startup.md)。
+> 来源：本分支新增整理的使用指南，首次提交 `d4224b2`。文中的本机路径、用户名和端口需按实际环境替换；不属于上游官方原版。 [文档索引](../README.md)。
+
+已完成本机 `WSL` 部署后，可直接双击仓库根目录的 `start.cmd`，自动检查并启动前后端、复制本人密钥并打开浏览器。详见[Windows 一键启动说明](one-click-startup.md)。
 
 这份文档可以独立使用：在本机 `WSL2` 中运行真实后端、命令行 `Agent` 和前端流程操作台。采用前台运行方式，关闭终端后不会作为系统服务自动启动。
 
@@ -94,7 +96,7 @@ wsl --list --verbose
 - `Stopped` 表示当前没有运行，执行下一步的进入命令就会启动它。
 - 已有可用的 `WSL2` 发行版，直接跳到 `0.3`，不必重复安装。
 
-如果提示没有安装发行版，或尚未启用 `WSL`：右键开始菜单，选择“终端（管理员）”或“Windows PowerShell（管理员）”，在管理员窗口执行：
+如果提示没有安装发行版，或尚未启用 `WSL`：右键开始菜单，选择“终端（管理员）”或“`Windows` `PowerShell`（管理员）”，在管理员窗口执行：
 
 ```powershell
 wsl --install -d Ubuntu
@@ -407,7 +409,7 @@ exit
 | 本人密钥无效 | 从 `~/.agent-autoloop-local/config.json` 重新读取 `owner`，不要填来源密钥或演示模式的密钥 |
 | 页面没有业务数据 | 尚未收到匹配事件时为空是正常的；按第五步运行 `try` |
 | 刷新页面后需要重新连接 | 密钥只保存在页面内存中，刷新后重新粘贴本人密钥即可 |
-| 找不到命令行 Agent 或未登录 | 在运行后端的同一个 `WSL2` 环境检查命令和登录状态；不要混用 `Windows` 与 `WSL2` 的安装 |
+| 找不到命令行 `Agent` 或未登录 | 在运行后端的同一个 `WSL2` 环境检查命令和登录状态；不要混用 `Windows` 与 `WSL2` 的安装 |
 | 查询到其他实例或提示未初始化 | 每个操作后端的终端都要设置相同的 `AGENT_AUTOLOOP_HOME` |
 | 切换运行环境后前端依赖报错 | 在当前 `WSL2` 环境重新执行 `npm --prefix frontend ci` |
 | 诊断提示系统服务未安装 | 本文使用 `--no-service`，需要手动保持后端窗口运行 |
@@ -419,10 +421,10 @@ exit
 - [本机部署验收记录](wsl2-deployment-verification.md)
 
 - [前后端启动总览与 Windows 演示模式](frontend-backend-startup.md)
-- [前端配置、构建与静态部署](../frontend/README.md)
-- [后端安装说明](../INSTALL.md)
-- [协议及权限](protocol.md)
-- [架构图](architecture.svg)
+- [前端配置、构建与静态部署](../../frontend/README.md)
+- [后端安装说明](../../INSTALL.md)
+- [协议及权限](../protocol.md)
+- [架构图](../architecture.svg)
 
 ## 官方参考资料
 

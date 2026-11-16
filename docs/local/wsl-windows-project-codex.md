@@ -1,8 +1,10 @@
-# 在 WSL 中打开 Windows 项目并使用 Codex
+# 在 `WSL` 中打开 `Windows` 项目并使用 `Codex`
+
+> 来源：本分支新增整理的使用指南，首次提交 `2392e73`。文中的本机路径、用户名和端口需按实际环境替换；不属于上游官方原版。 [文档索引](../README.md)。
 
 本文按当前电脑已经配置好的环境编写，以 `D:\programs\ai\ai-ops` 为例。第一次安装 `WSL`、`Node.js` 和 `Codex` 的步骤已经完成；平时使用按下面操作即可。
 
-## 一、从 Windows 进入 WSL
+## 一、从 `Windows` 进入 `WSL`
 
 按 `Win+R`，输入 `powershell`，按回车。
 
@@ -20,7 +22,7 @@ edy@CHINAMI-6OQ3Q63:~$
 
 后面的 `bash` 命令都在这个窗口执行。不要复制提示符，只复制代码块里的命令；每条执行完成后再继续。
 
-## 二、进入 Windows 中的项目目录
+## 二、进入 `Windows` 中的项目目录
 
 ```bash
 cd /mnt/d/programs/ai/ai-ops
@@ -32,7 +34,7 @@ ls
 
 这是同一份项目文件。`Codex` 获准修改后，改动也会立即体现在 `Windows` 的原目录中，无需另行同步。
 
-| Windows 路径 | WSL 中使用的路径 |
+| `Windows` 路径 | `WSL` 中使用的路径 |
 | --- | --- |
 | `D:\programs\ai\ai-ops` | `/mnt/d/programs/ai/ai-ops` |
 | `D:\github\another-project` | `/mnt/d/github/another-project` |
@@ -40,7 +42,7 @@ ls
 
 规则是盘符变成 `/mnt/小写盘符`，路径分隔符改成 `/`。路径有空格时加引号，例如 `cd "/mnt/d/My Projects/demo"`。
 
-## 三、加载 Linux 版 Node.js 和现有中转站配置
+## 三、加载 `Linux` 版 `Node.js` 和现有中转站配置
 
 在同一个 `WSL` 窗口执行：
 
@@ -77,7 +79,7 @@ codex-cli 0.168.0
 
 如果 `codex` 指向 `/mnt/d/nodejs/global/...`，表示仍在调用 `Windows` 安装，先按[部署指南](wsl2-deployment.md)修正，不能仅凭 `node --version` 正常就继续。
 
-## 四、在项目中启动 Codex 并交代任务
+## 四、在项目中启动 `Codex` 并交代任务
 
 ### 只检查，不改代码
 
@@ -190,7 +192,7 @@ wsl -d Ubuntu -u edy -- bash /home/edy/.agent-autoloop-local/checks/ai-ops-e2e/t
 | 缺少 `codex-linux-x64` 依赖 | 检查 `command -v codex`，按部署指南使用 `Linux` 安装 |
 | 中转站配置没有生效 | 在启动 `codex` 的同一个终端执行 `export CODEX_HOME=/mnt/c/Users/EDY/.codex` |
 | 只读会话不能写测试报告或启动需要缓存的工具 | 保留只读限制，改用已经配置的独立检查入口；允许写入时另开相应会话 |
-| Windows 能启动项目，WSL 构建时报平台依赖缺失 | 两边不能直接共用所有平台构建依赖。先决定依赖在哪个环境安装，再按该项目的锁文件安装；不要同时重装同一份 `node_modules` |
+| `Windows` 能启动项目，`WSL` 构建时报平台依赖缺失 | 两边不能直接共用所有平台构建依赖。先决定依赖在哪个环境安装，再按该项目的锁文件安装；不要同时重装同一份 `node_modules` |
 
 本次整理只核对了本机目录、命令路径、版本与帮助参数，没有额外调用模型或修改 `ai-ops` 代码。
 
