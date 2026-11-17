@@ -60,6 +60,7 @@ function choose(id: string) {
         :zoom-on-double-click="false"
         :zoom-on-scroll="false"
         :zoom-on-pinch="false"
+        :zoom-activation-key-code="null"
         :pan-on-drag="false"
         :pan-on-scroll="false"
         :prevent-scrolling="false"
