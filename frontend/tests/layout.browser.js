@@ -4,7 +4,10 @@ async (page) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await page.goto('http://127.0.0.1:5193');
   await page.getByLabel('本人密钥', { exact: true }).waitFor();
+  const intro = await page.locator('.page-intro').boundingBox();
   const connection = await page.locator('.connection').boundingBox();
+  if (Math.abs(intro.y - connection.y) > 1) throw new Error('Title and overview are not in one row');
+  if (intro.x + intro.width > connection.x) throw new Error('Title overlaps connection');
   const metrics = await page.getByRole('region', { name: '运行概况' }).boundingBox();
   if (Math.abs(connection.y - metrics.y) > 1) throw new Error('Connection and metrics are not in one row');
   if (connection.x + connection.width > metrics.x) throw new Error('Connection overlaps metrics');

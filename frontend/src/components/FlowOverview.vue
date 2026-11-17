@@ -21,7 +21,7 @@ onBeforeUnmount(() => observer?.disconnect());
 const graph = computed(() => buildWorkflow(props.state, props.run, props.facts, props.live));
 const { fitView, dimensions, onNodesInitialized } = useVueFlow("runtime-flow");
 function fitCanvas() {
-  void nextTick(() => fitView({ padding: 0.12 }));
+  void nextTick(() => fitView({ padding: 0.2 }));
 }
 onNodesInitialized(fitCanvas);
 watch(
@@ -52,7 +52,7 @@ function choose(id: string) {
         :nodes="graph.nodes"
         :edges="graph.edges"
         fit-view-on-init
-        :min-zoom="0.25"
+        :min-zoom="0.05"
         :max-zoom="1.5"
         :nodes-draggable="false"
         :nodes-connectable="false"
@@ -64,7 +64,7 @@ function choose(id: string) {
         :pan-on-drag="false"
         :pan-on-scroll="false"
         :prevent-scrolling="false"
-        :fit-view-params="{ padding: 0.12 }"
+        :fit-view-params="{ padding: 0.2 }"
         @node-click="choose($event.node.id)"
       >
         <template #node-stage="nodeProps"><FlowStage v-bind="nodeProps" /></template>

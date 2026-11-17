@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, onMounted } from "vue";
 import { useConsole } from "./hooks/useConsole";
-import { Workflow, Radio, RefreshCw, Settings2, Plus, PanelRight, ListFilter, ChevronRight } from "@lucide/vue";
+import { Workflow, Radio, RefreshCw, Settings2, Plus, PanelRight, ListFilter } from "@lucide/vue";
 import ActivityFeed from "./components/ActivityFeed.vue";
 import { time } from "./model";
 import ConnectionPanel from "./components/ConnectionPanel.vue";
@@ -116,85 +116,117 @@ function send(key: string, event: EventInput) {
       </div>
     </header>
     <main>
-      <div class="page-intro">
-        <div>
-          <div class="breadcrumb">工作空间 <ChevronRight :size="13" /> 运行监控</div>
+      <div class="summary-header">
+        <div class="page-intro">
           <h1>流程运行台 <span class="version-chip">LIVE</span></h1>
-          <p>让事件、执行和每一次决定，都在同一张图上连接起来。</p>
-        </div>
-        <div class="refresh-caption">
-          <span><Radio :size="14" /> 实时事实订阅</span><span>上次更新 {{ time(updated) }}</span>
-        </div>
-      </div>
-      <div class="overview-bar">
-        <ConnectionPanel
-          v-if="settings || mode === 'local'"
-          :connected="connected"
-          :busy="busy"
-          :connecting="connecting"
-          :mode="mode"
-          @connect="open"
-          @disconnect="disconnect"
-          @retry="discover"
-        />
-        <section class="metrics" aria-label="运行概况">
-          <div v-for="metric in metrics" :key="metric.label" class="metric">
-            <span><i :class="metric.tone"></i>{{ metric.label }}</span
-            ><strong
-              >{{ metric.value ?? "—" }}<small>{{ metric.unit }}</small></strong
-            ><span class="metric-caption">{{
-              metric.label === "需要你处理"
-                ? "回答或结案后继续"
-                : metric.label === "正在执行"
-                  ? "接单端正在处理"
-                  : metric.label === "等待执行"
-                    ? "等待可用执行容量"
-                    : "以中台记录为准"
-            }}</span>
+          <div class="refresh-caption">
+            <span><Radio :size="14" /> 实时事实订阅</span><span>上次更新 {{ time(updated) }}</span>
           </div>
-        </section>
+        </div>
+        <div class="overview-bar">
+          <ConnectionPanel
+            v-if="settings || mode === 'local'"
+            :connected="connected"
+            :busy="busy"
+            :connecting="connecting"
+            :mode="mode"
+            @connect="open"
+            @disconnect="disconnect"
+            @retry="discover"
+          />
+          <section class="metrics" aria-label="运行概况">
+            <div v-for="metric in metrics" :key="metric.label" class="metric">
+              <span><i :class="metric.tone"></i>{{ metric.label }}</span
+              ><strong
+                >{{ metric.value ?? "—" }}<small>{{ metric.unit }}</small></strong
+              ><span class="metric-caption">{{
+                metric.label === "需要你处理"
+                  ? "回答或结案后继续"
+                  : metric.label === "正在执行"
+                    ? "接单端正在处理"
+                    : metric.label === "等待执行"
+                      ? "等待可用执行容量"
+                      : "以中台记录为准"
+              }}</span>
+            </div>
+          </section>
+        </div>
       </div>
-      <div v-if="error || streamError" role="alert" class="error-banner">
-        <strong>{{ error || streamError }}</strong><span>{{
-          state
-            ? "当前显示上次读取的数据，可能已经过期。流程动画已暂停。"
-            : mode === "local"
-              ? "请检查本机中台是否运行，再点击连接重试。"
-              : "请检查中台地址、代理设置和本人密钥。"
-        }}</span
-        ><button :disabled="busy || !connected" @click="refresh">重新读取</button>
-      </div>
-      <div v-if="message" role="status" class="message-banner">{{ message }}</div>
-      <EventComposer
-        :key="'event-' + sessionKey"
-        v-if="composer && connected"
-        :pending="pending"
-        @send="send"
-        @close="composer = false"
-      />
-      <div class="workspace">
-        <RunList
-          :runs="runs"
-          :selected="selected"
-          :has-more="hasMore"
-          :busy="busy"
-          :filter="filter"
-          @select="chooseRun"
-          @more="more"
-          @filter="filter = $event"
+      <section class="content-scroll" aria-label="工作区" tabindex="0">
+        <div v-if="error || streamError" role="alert" class="error-banner">
+          <strong>{{ error || streamError }}</strong><span>{{
+            state
+              ? "当前显示上次读取的数据，可能已经过期。流程动画已暂停。"
+              : mode === "local"
+                ? "请检查本机中台是否运行，再点击连接重试。"
+                : "请检查中台地址、代理设置和本人密钥。"
+          }}</span
+          ><button :disabled="busy || !connected" @click="refresh">重新读取</button>
+        </div>
+        <div v-if="message" role="status" class="message-banner">{{ message }}</div>
+        <EventComposer
+          :key="'event-' + sessionKey"
+          v-if="composer && connected"
+          :pending="pending"
+          @send="send"
+          @close="composer = false"
         />
-        <div class="canvas-column">
-          <FlowOverview
-            :state="state"
-            :run="run"
-            :facts="facts"
-            :live="live"
+        <div class="workspace">
+          <RunList
+            :runs="runs"
+            :selected="selected"
+            :has-more="hasMore"
+            :busy="busy"
+            :filter="filter"
+            @select="chooseRun"
+            @more="more"
             @filter="filter = $event"
-            @inbox="showInbox"
-          /><ActivityFeed :facts="activity" :connected="live" />
+          />
+          <div class="canvas-column">
+            <FlowOverview
+              :state="state"
+              :run="run"
+              :facts="facts"
+              :live="live"
+              @filter="filter = $event"
+              @inbox="showInbox"
+            /><ActivityFeed :facts="activity" :connected="live" />
+          </div>
+          <section id="inspector" class="inspector">
+            <div class="inspector-tabs">
+              <button :aria-pressed="inspector === 'trace'" @click="inspector = 'trace'">
+                <PanelRight :size="15" />执行详情</button
+              ><button :aria-pressed="inspector === 'inbox'" @click="inspector = 'inbox'">
+                <ListFilter :size="15" />待你处理 <span class="count">{{ state?.cards.length ?? 0 }}</span>
+              </button>
+            </div>
+            <RunDetail
+              v-show="inspector === 'trace'"
+              :run="run"
+              :facts="facts"
+              :busy="detailBusy"
+              :error="detailError"
+              :pending="pending"
+              @stop="stop"
+              @retry="loadDetail"
+            /><CardInbox
+              :key="'inbox-' + sessionKey"
+              v-show="inspector === 'inbox'"
+              :cards="state?.cards ?? []"
+              :pending="pending"
+              @answer="answer"
+              @resolve="resolve"
+            />
+          </section>
+        </div>
+        <footer>
+          <span
+            ><i class="dot" :class="{ 'dot--green': live }"></i>{{ live ? "事实流已连接" : "等待实时连接" }} ·
+            凭据仅保存在内存</span
+          >
           <div class="canvas-footnote">
-            <span class="mono">HTTP + JSON / SSE</span><span>只展示已上报的事实，不推测 Agent 内部步骤</span
-            ><button
+            <span class="mono">HTTP + JSON / SSE</span><span>只展示已上报的事实，不推测 Agent 内部步骤</span>
+            <button
               v-if="run"
               class="text-button"
               @click="
@@ -205,47 +237,16 @@ function send(key: string, event: EventInput) {
               返回全局视图
             </button>
           </div>
-        </div>
-        <section id="inspector" class="inspector">
-          <div class="inspector-tabs">
-            <button :aria-pressed="inspector === 'trace'" @click="inspector = 'trace'">
-              <PanelRight :size="15" />执行详情</button
-            ><button :aria-pressed="inspector === 'inbox'" @click="inspector = 'inbox'">
-              <ListFilter :size="15" />待你处理 <span class="count">{{ state?.cards.length ?? 0 }}</span>
-            </button>
-          </div>
-          <RunDetail
-            v-show="inspector === 'trace'"
-            :run="run"
-            :facts="facts"
-            :busy="detailBusy"
-            :error="detailError"
-            :pending="pending"
-            @stop="stop"
-            @retry="loadDetail"
-          /><CardInbox
-            :key="'inbox-' + sessionKey"
-            v-show="inspector === 'inbox'"
-            :cards="state?.cards ?? []"
-            :pending="pending"
-            @answer="answer"
-            @resolve="resolve"
-          />
-        </section>
-      </div>
-      <footer>
-        <span
-          ><i class="dot" :class="{ 'dot--green': live }"></i>{{ live ? "事实流已连接" : "等待实时连接" }} ·
-          凭据仅保存在内存</span
-        ><span v-if="state"
-          >今日已上报 {{ state.spending.today.tokens.toLocaleString() }} tokens · ${{
-            state.spending.today.cost.toFixed(4)
-          }}<span class="usage-note"
-            >{{ state.spending.today.missingTokens }} 轮未上报 Token /
-            {{ state.spending.today.missingCost }} 轮未上报费用</span
-          ></span
-        >
-      </footer>
+          <span v-if="state"
+            >今日已上报 {{ state.spending.today.tokens.toLocaleString() }} tokens · ${{
+              state.spending.today.cost.toFixed(4)
+            }}<span class="usage-note"
+              >{{ state.spending.today.missingTokens }} 轮未上报 Token /
+              {{ state.spending.today.missingCost }} 轮未上报费用</span
+            ></span
+          >
+        </footer>
+      </section>
     </main>
   </div>
 </template>
