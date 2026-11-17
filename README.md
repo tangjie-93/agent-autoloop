@@ -73,14 +73,23 @@ Agent 结束了这一轮，问了你一个问题。它现在不占进程、不�
 
 ## 流程操作台
 
-仓库内的 `frontend/` 是独立的 `Vue` 客户端。先启动中台，再在源码仓库根目录运行：
+仓库内的 `frontend/` 是独立的 `Vue` 客户端。原生 `Windows` 先安装前端依赖，再在仓库根目录运行 `npm start`，它会启动或复用本机中台和前端：
+
+```powershell
+npm --prefix frontend ci
+npm start
+```
+
+入口是 `scripts/start-console.ts`，也可直接执行 `node scripts/start-console.ts`（`Node 24+`）；用 `npm start -- --help` 查看参数。启动器使用 `Windows node.exe` 直接运行前端；数据目录默认 `%USERPROFILE%\.agent-autoloop`，可由 `AGENT_AUTOLOOP_HOME` 覆盖，日志与自己启动的前后端进程记录在 `<数据目录>\logs\console`。完整步骤及手动停止见[原生部署](docs/local/windows-native-deployment.md)；需要 `Linux` 工具时才用 [备用方案](docs/local/wsl2-deployment.md)，不会自动迁移数据或复制登录凭据。
+
+`macOS` / `Linux` 或手动开发时，先启动中台，再在源码仓库根目录运行（示例地址换成 `config.json` 的 `url`）：
 
 ```bash
 npm --prefix frontend ci
-npm --prefix frontend run dev
+AGENT_AUTOLOOP_URL=http://127.0.0.1:7317 npm --prefix frontend run dev
 ```
 
-打开终端打印的本机地址，输入 `config.json` 的本人密钥（`owner`）。页面通过实时事实流更新运行画布，可查看流程和轮次详情、回答卡片、结案和请求停止；发送事件需要单独的来源密钥。凭据只留在页面内存，刷新后重新输入。
+通过 `npm start` 打开的本机页面只需点击“连接中台”，无需输入或复制本人密钥（`owner`）。启动器通过仅服务端使用的 `AGENT_AUTOLOOP_LOCAL_CONFIG` 指定配置路径，`owner` 留在 `Vite` 服务端；浏览器只在内存持有短时随机会话，经回环地址、`Host`、`Origin` 校验和路由白名单授权后，由本机网关代为鉴权。点击“断开连接”会撤销会话、关闭 `SSE` 并清空页面，不停止后台任务。手动 `npm --prefix frontend run dev`、静态或远程部署仍需输入 `owner`，只保存在页面内存。页面通过实时事实流更新运行画布，可查看流程和轮次详情、回答卡片、结案和请求停止；发送事件仍需独立的来源密钥。`Agent` 由接单程序后台运行，输出保存在轮次日志；操作台不直播交互终端，也不自动监控手动开的 `Codex` 会话。
 
 地址不同时，启动前设置服务端环境变量 `AGENT_AUTOLOOP_URL`，将本站 `/v1` 代理到固定中台。`npm --prefix frontend run build` 生成 `frontend/dist/`，正式部署使用同源静态托管及固定反向代理，对外使用 `HTTPS`。前端依赖单独管理，中台仍无运行时依赖；安装器不自动启动操作台。完整步骤见[操作台说明](frontend/README.md)。
 

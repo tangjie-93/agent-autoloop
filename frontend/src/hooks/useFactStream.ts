@@ -1,6 +1,6 @@
 import { shallowRef, getCurrentScope, onScopeDispose } from "vue";
 import { watchFacts } from "../service/facts.ts";
-import type { Fact } from "../types/console.ts";
+import type { Fact, ConsoleAuth } from "../types/console.ts";
 import type { FactStreamOptions, StreamStatus } from "../types/realtime.ts";
 
 /** Each connection owns one subscription, cursor and retry; an old owner cannot update the new one. */
@@ -21,7 +21,7 @@ export function useFactStream(options: FactStreamOptions) {
     activity.value = [];
     error.value = "";
   }
-  function connect(key: string) {
+  function connect(key: ConsoleAuth) {
     disconnect();
     controller = new AbortController();
     const version = generation,

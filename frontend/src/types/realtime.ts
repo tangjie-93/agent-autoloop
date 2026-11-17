@@ -1,7 +1,7 @@
-import type { Fact, Fetcher } from "./console.ts";
+import type { Fact, Fetcher, ConsoleAuth } from "./console.ts";
 export type StreamStatus = "disconnected" | "connecting" | "live" | "reconnecting";
 export type FactSubscription = (
-  key: string,
+  key: ConsoleAuth,
   after: number,
   signal: AbortSignal,
   onFact: (fact: Fact) => void,

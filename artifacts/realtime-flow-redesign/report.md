@@ -10,7 +10,9 @@
 - 原有回答、结案、停止请求、独立来源发送事件仍使用原接口；前后端协议及内核没有修改。依赖仅在 `frontend/`。
 - 同步两份 `README`、`INSTALL`、正式 `SKILL`、协议、安全说明、前端说明和启动文档的刷新口径。架构图标注实时画布。静态反代示例关闭流缓冲并延长读取超时。
 
-## 验证
+## 历史验证记录
+
+以下为实时画布改版当时的记录，不是本次原生 `Windows` 部署文档修订的通过结果；本次没有重新运行这些检查。
 
 新增 `frontend/tests/realtime.test.ts`，实现前运行得到模块不存在失败；实现后连同原测试共 `14` 条通过。覆盖分块中文 SSE、鉴权头及游标、旧订阅隔离、重连游标和状态、真实活动节点动画及断线停动。
 
@@ -45,7 +47,10 @@ node --disable-warning=ExperimentalWarning --test tests/purity.test.ts
 
 根 `npm run test:quick` 实际执行，出现既存的 Windows ACP 权限/符号链接、缺少 codex 程序、备份权限与清理失败，随后没有正常结束；已停止本次测试进程树，不能记为通过。没有运行模拟、变异或发布流程，本批未修改内核、协议实现或调度。
 
-运行方式见 [启动步骤](../../docs/local/frontend-backend-startup.md)。依赖变化后先执行 `npm --prefix frontend ci`，再按原方式启动中台及前端。
-## 收尾
+运行方式见[原生 Windows 部署](../../docs/local/windows-native-deployment.md)。依赖变化后先执行 `npm --prefix frontend ci`，再按原方式启动中台及前端。
 
-本轮浏览器、前端服务和临时中台已停止。临时目录 `C:/Users/EDY/AppData/Local/Temp/autoloop-browser-GdodHF` 仍存在；已核实其绝对路径后尝试 `Remove-Item -LiteralPath -Recurse -Force`，自动审批拒绝并仅返回 `blocked by policy`。未更换工具绕过，可手工清理这个本轮目录。
+## 历史收尾
+
+以下是当时的清理记录，不代表当前目录或进程状态。
+
+当时的浏览器、前端服务和临时中台已停止。临时目录 `C:/Users/EDY/AppData/Local/Temp/autoloop-browser-GdodHF` 仍存在；已核实其绝对路径后尝试 `Remove-Item -LiteralPath -Recurse -Force`，自动审批拒绝并仅返回 `blocked by policy`。未更换工具绕过，可手工清理这个本轮目录。

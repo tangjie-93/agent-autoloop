@@ -2,7 +2,8 @@ import { shallowRef, computed, getCurrentScope, onScopeDispose } from "vue";
 import { useFactStream } from "./useFactStream.ts";
 import { createHub } from "../service/hub.ts";
 import { mergeRuns, runFromFacts } from "../model.ts";
-import type { ConsoleOptions, HubState, Run, Fact } from "../types/console.ts";
+import type { ConsoleOptions, HubState, Run, Fact, ConsoleAuth, ConnectionMode } from "../types/console.ts";
+import { localMode, openSession, closeSession } from "../service/session.ts";
 /** Own one connection generation and cancel obsolete reads without replaying writes. */
 export function useConsole(options: ConsoleOptions = {}) {
   const state = shallowRef<HubState | null>(null),
@@ -16,8 +17,35 @@ export function useConsole(options: ConsoleOptions = {}) {
     detailBusy = shallowRef(false),
     pending = shallowRef(false),
     connected = shallowRef(false),
+    connecting = shallowRef(false),
+    mode = shallowRef<ConnectionMode>("checking"),
     updated = shallowRef(""),
     hasMore = shallowRef(false);
+  const fetcher = options.fetcher ?? fetch;
+  let session: string | null = null;
+  let discovery = 0;
+  const discoveryController = new AbortController();
+  async function discover() {
+    const version = ++discovery;
+    mode.value = "checking";
+    error.value = "";
+    try {
+      const local = await localMode(fetcher, AbortSignal.any([discoveryController.signal, AbortSignal.timeout(5000)]));
+      if (version === discovery && !discoveryController.signal.aborted) mode.value = local ? "local" : "manual";
+    } catch (cause) {
+      if (version !== discovery || discoveryController.signal.aborted) return;
+      mode.value = "error";
+      error.value = cause instanceof Error ? cause.message : "检查本机连接失败，请重试。";
+    }
+  }
+  async function revoke(token: string) {
+    try {
+      await closeSession(fetcher, token);
+    } catch (cause) {
+      if (!connected.value && !connecting.value)
+        message.value = cause instanceof Error ? cause.message : "会话撤销未确认。";
+    }
+  }
   let generation = 0,
     detailGeneration = 0,
     hub: ReturnType<typeof createHub> | null = null,
@@ -41,6 +69,10 @@ export function useConsole(options: ConsoleOptions = {}) {
   const stream = useFactStream({ onChange: scheduleRefresh, onOpen: scheduleRefresh, fetcher: options.fetcher });
   const run = computed(() => runs.value.find((r) => r.id === selected.value) ?? null);
   function disconnect() {
+    const previousSession = session;
+    session = null;
+    if (previousSession) void revoke(previousSession);
+    connecting.value = false;
     generation++;
     detailGeneration++;
     stream.disconnect();
@@ -148,14 +180,43 @@ export function useConsole(options: ConsoleOptions = {}) {
       }
     }
   }
-  async function connect(key: string) {
+  /** A handshake belongs to the same generation as its first state read; a late token must be revoked, not reused. */
+  async function connect(key?: string) {
     disconnect();
     controller = new AbortController();
-    hub = createHub(key, options.fetcher);
-    connected.value = true;
     const version = generation;
-    await refresh();
-    if (version === generation && realtime) stream.connect(key);
+    connecting.value = true;
+    try {
+      let auth: ConsoleAuth;
+      if (mode.value === "local") {
+        const token = await openSession(fetcher, AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]));
+        if (version !== generation) {
+          await revoke(token);
+          return;
+        }
+        session = token;
+        auth = { session: token };
+      } else {
+        if (!key?.trim()) throw new Error("请填写本人密钥，或用 npm start 启用本机连接。");
+        auth = key.trim();
+      }
+      hub = createHub(auth, options.fetcher);
+      await refresh();
+      if (version !== generation) return;
+      if (!state.value) throw new Error(error.value || "中台暂不可用，请重试。");
+      connected.value = true;
+      if (realtime) stream.connect(auth);
+    } catch (cause) {
+      if (version !== generation) return;
+      const text = cause instanceof Error ? cause.message : "连接失败，请重试。";
+      const failedSession = session;
+      session = null;
+      disconnect();
+      if (failedSession) await revoke(failedSession);
+      if (generation === version + 1) error.value = text;
+    } finally {
+      if (version === generation) connecting.value = false;
+    }
   }
   async function more() {
     if (!hub || !cursor || loading) return;
@@ -202,7 +263,11 @@ export function useConsole(options: ConsoleOptions = {}) {
       if (version === generation) pending.value = false;
     }
   }
-  if (getCurrentScope()) onScopeDispose(disconnect);
+  if (getCurrentScope())
+    onScopeDispose(() => {
+      discoveryController.abort();
+      disconnect();
+    });
   return {
     streamStatus: stream.status,
     streamError: stream.error,
@@ -218,6 +283,9 @@ export function useConsole(options: ConsoleOptions = {}) {
     detailBusy,
     pending,
     connected,
+    connecting,
+    mode,
+    discover,
     updated,
     hasMore,
     run,

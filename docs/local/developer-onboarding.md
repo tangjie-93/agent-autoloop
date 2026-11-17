@@ -1,14 +1,14 @@
 # `Agent Autoloop` 二次开发导览
 
-> 来源：本地二次开发导览草稿，整理前未纳入 `Git`，作者无法由提交历史确认。原核对基线为 `d5ffe1c`；末尾验证结果是原记录，本次整理未重新运行。 [文档索引](../README.md)。
+> 面向第一次接手的程序员；本文介绍调用链、状态和扩展点，不替代[原生 Windows 部署](windows-native-deployment.md)或 [WSL2 备用部署](wsl2-deployment.md)。历史验证数字不作为当前版本的通过证明。 [文档索引](../README.md)。
 
-面向第一次接手的程序员。按“理解一轮 → 本地跑通 → 跟调用链 → 找扩展点”的顺序读。本文最初依据源码基线 `d5ffe1c`、已有行为测试及[协议](../protocol.md)编写；[架构图](../architecture.svg)用于总览。源码链接相对本文所在的 `docs/local/`，函数名用于定位，避免行号随修改失效。
+按“理解一轮 → 本地跑通 → 跟调用链 → 找扩展点”的顺序读。源码链接相对本文所在的 `docs/local/`，函数名用于定位，避免行号随修改失效。
 
 ## 1. 先理解：它替你管理的是事项，不只是启动命令
 
 它把外部事件交给本机或其他电脑上的命令行 `Agent`，负责排队、并发、失败重派、记录结果和向人提问。`Agent` 每次只执行一轮；需要人决定时交回问题并退出，回答到达后再启动一轮。中台和接单程序仍常驻，等待期间没有执行该问题的 `Agent` 进程。
 
-从程序角度看，核心是“确定性决策 + 事实日志 + 主动连接中台的插件”。内核仅提供无需脚本的卡片回答表单；本分支另有独立的 `Vue 3` [流程操作台](../../frontend/README.md)，通过现有协议连接中台。本文主要介绍后端调用链，前端启动见[前后端启动步骤](frontend-backend-startup.md)。证据：[host/up.ts](../../host/up.ts) 的 `up()`、[kernel/decide.ts](../../kernel/decide.ts) 的 `finish()` / `answer()`、[kernel/card-page.ts](../../kernel/card-page.ts)。
+从程序角度看，核心是“确定性决策 + 事实日志 + 主动连接中台的插件”。内核仅提供无需脚本的卡片回答表单；本分支另有独立的 `Vue 3` [流程操作台](../../frontend/README.md)，通过现有协议连接中台。本文主要介绍后端调用链，部署入口见[原生 Windows 部署](windows-native-deployment.md)。证据：[host/up.ts](../../host/up.ts) 的 `up()`、[kernel/decide.ts](../../kernel/decide.ts) 的 `finish()` / `answer()`、[kernel/card-page.ts](../../kernel/card-page.ts)。
 
 ### 1.1 一个完整场景：线上告警，需要本人决定是否重启
 
@@ -64,7 +64,7 @@ node --disable-warning=ExperimentalWarning --test tests/loop.test.ts
 
 ### 2.3 手动启动一个可调试的开发实例
 
-以下在仓库根目录的终端甲执行。整个演示不调用模型、不发送真实通知。专用临时目录避免碰到正在使用的中台；清掉另外两个路径变量，避免继承其他实例的规则和地址。
+以下是在 `macOS` / `Linux bash` 中的源码调试示例；原生 `Windows` 安装和启动见[部署指南](windows-native-deployment.md)。整个演示不调用模型、不发送真实通知。专用临时目录避免碰到正在使用的中台；清掉另外两个路径变量，避免继承其他实例的规则和地址。
 
 ````bash
 export AGENT_AUTOLOOP_HOME="$(mktemp -d /tmp/autoloop-dev.XXXXXX)"
@@ -97,6 +97,16 @@ s.listen(0, "127.0.0.1", () => { console.log(s.address().port); s.close(); });
 ')
 node bin/agent-autoloop.ts init --no-service --port "$dev_port" \
   --command "node $AGENT_AUTOLOOP_HOME/demo.mjs"
+# This demo does not exercise desktop notifications.
+node --input-type=module -e '
+import { readFileSync, writeFileSync } from "node:fs";
+for (const name of ["config.json", "rules.json"]) {
+  const path = process.env.AGENT_AUTOLOOP_HOME + "/" + name;
+  const value = JSON.parse(readFileSync(path, "utf8"));
+  if (value.channels) delete value.channels.desktop;
+  writeFileSync(path, JSON.stringify(value, null, 2) + "\n");
+}
+'
 node bin/agent-autoloop.ts check
 printf '开发数据目录：%s\n' "$AGENT_AUTOLOOP_HOME"
 node bin/agent-autoloop.ts up
@@ -299,9 +309,9 @@ npm run test:nightly
 
 新增插件通常只需要配置、该插件和相应行为测试；只有确实改变公共行为时才进入协议或内核。修改 `kernel/worker/protocol/host` 的拉取请求合并前，还需独立审查者检查调用方、真实外部运行证据及同类问题，具体要求以 [AGENTS.md](../../AGENTS.md) 为准。
 
-## 7. 本次导览的验证记录
+## 7. 历史导览验证记录
 
-在 `Node v24.12.0` 上核实：
+以下保留原导览在 `Node v24.12.0` 上的历史记录；不是本次文档修订或原生 `Windows` 部署的验收结果，本次没有重跑这些命令。上面的步骤后续如有调整，也需重新验收：
 
 - 第 `2.3` 节的临时实例命令已实跑，事件、提问、回答、第二轮完成、`why` 查询和重复事件去重通过；退出后清理临时实例。
 - `npm run typecheck`、`npm run format:check` 通过；本文另行检查 `Markdown` 格式及相对源码链接。

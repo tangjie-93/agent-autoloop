@@ -4,3 +4,8 @@ node_modules/
 .claude/
 frontend/dist/
 .playwright-cli/
+.agents/
+.codex/
+.devflow/
+artifacts/
+package-lock.json

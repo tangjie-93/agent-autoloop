@@ -75,14 +75,23 @@ Anything the agent can handle alone takes the auto-loop at the top of the diagra
 
 ## Flow console
 
-`frontend/` is an independent `Vue` client. Start the hub, then run these commands from a source checkout:
+`frontend/` is an independent `Vue` client. On native `Windows`, install its dependencies once and run `npm start` from the repository root; it starts or reuses the local hub, worker, and console:
+
+```powershell
+npm --prefix frontend ci
+npm start
+```
+
+The entry point is `scripts/start-console.ts`, also runnable as `node scripts/start-console.ts` with `Node 24+`. Run `npm start -- --help` for options. The launcher runs `Vite` directly with `Windows node.exe`; installation and service/worker features still require system `PowerShell`. It uses `AGENT_AUTOLOOP_HOME`, defaulting to `%USERPROFILE%\.agent-autoloop`, and records logs and the frontend/backend processes it starts under `<home>\logs\console`. See the [native deployment guide](docs/local/windows-native-deployment.md) for setup and manual shutdown. Use the [WSL fallback](docs/local/wsl2-deployment.md) only when `Linux` tooling is needed; there is no automatic migration or copying of login secrets.
+
+On `macOS` / `Linux`, or for manual development, start the hub first, then run from the source checkout (replace the example address with `url` from `config.json`):
 
 ```bash
 npm --prefix frontend ci
-npm --prefix frontend run dev
+AGENT_AUTOLOOP_URL=http://127.0.0.1:7317 npm --prefix frontend run dev
 ```
 
-Open the local address printed by the command and enter the owner key (`owner` in `config.json`). The console updates its Vue Flow canvas through the authenticated SSE fact stream, shows run history, and supports answering cards, resolving them, and requesting cancellation. Sending events requires a separate source key. Keys stay in page memory and must be entered again after reloading.
+With `npm start`, click “连接中台” (connect) on the local page; no owner key entry or clipboard copy is needed. The launcher sets the server-only `AGENT_AUTOLOOP_LOCAL_CONFIG` path: `owner` stays in the `Vite` server, while the browser holds only a short-lived random session in memory. The local gateway checks loopback access, `Host`, `Origin`, and an allowed-route list before adding owner authorization. Disconnecting revokes the session, closes `SSE`, and clears page data; it does not stop background tasks. Manual `npm --prefix frontend run dev`, static hosting, and remote deployments still require owner key entry, held only in page memory. The console updates its `Vue Flow` canvas through the authenticated `SSE` fact stream, shows run history, and supports answering cards, resolving them, and requesting cancellation. Sending events still requires a separate source key. Worker-managed agents run in the background with per-run logs, not interactive terminal windows. The console does not stream their terminal output or automatically monitor manually opened `Codex` sessions.
 
 Set the server-side `AGENT_AUTOLOOP_URL` before starting if the hub has a different address. Same-origin `/v1` requests go to this fixed target. `npm --prefix frontend run build` produces `frontend/dist/`. Production hosting needs a static server and fixed same-origin reverse proxy, with `HTTPS` for external access. Frontend dependencies are separate; the hub still has zero runtime dependencies. The installer does not start the console. See the [console guide](frontend/README.md) for details (in Chinese).
 

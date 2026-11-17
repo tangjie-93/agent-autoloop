@@ -1,11 +1,12 @@
 import { createParser } from "eventsource-parser";
+import { authHeaders } from "./session.ts";
 import type { Fact } from "../types/console.ts";
 import type { FactSubscription } from "../types/realtime.ts";
 
 /** Read authenticated SSE incrementally; credentials never enter the URL. */
 export const watchFacts: FactSubscription = async (key, after, signal, onFact, onOpen, fetcher = fetch) => {
   const response = await fetcher(`/v1/stream?after=${after}`, {
-    headers: { Authorization: `Bearer ${key}`, Accept: "text/event-stream" },
+    headers: { ...authHeaders(key), Accept: "text/event-stream" },
     signal,
     credentials: "omit",
     redirect: "error",

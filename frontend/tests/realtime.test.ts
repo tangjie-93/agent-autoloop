@@ -41,6 +41,33 @@ test("authenticated SSE preserves split Unicode and resumes after the supplied s
   );
 });
 
+test("a local SSE connection uses only its session header and cancellation closes its reader", async () => {
+  const controller = new AbortController();
+  let cancelled = false;
+  await watchFacts(
+    { session: "memory-only-session" },
+    4,
+    controller.signal,
+    () => {},
+    () => controller.abort(),
+    async (url, init) => {
+      assert.equal(url, "/v1/stream?after=4");
+      const headers = new Headers(init?.headers);
+      assert.equal(headers.get("X-Autoloop-Session"), "memory-only-session");
+      assert.equal(headers.get("Authorization"), null);
+      return new Response(
+        new ReadableStream({
+          cancel() {
+            cancelled = true;
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      );
+    },
+  );
+  assert.equal(cancelled, true);
+});
+
 test("a superseded stream is aborted and cannot publish into a new connection", async () => {
   const callbacks: ((f: Fact) => void)[] = [];
   const signals: AbortSignal[] = [];

@@ -1,437 +1,115 @@
-# 在 `WSL2` 中启动真实 `Agent` 和前端
+# `WSL2` 备用部署方案
 
-> 来源：本分支新增整理的使用指南，首次提交 `d4224b2`。文中的本机路径、用户名和端口需按实际环境替换；不属于上游官方原版。 [文档索引](../README.md)。
+本地 `Windows` 电脑优先使用[原生部署](windows-native-deployment.md)。只有选用的 `Agent` 或依赖要求 `Linux`，或原生工具在当前环境无法运行时，才使用本文。常规 `macOS` / `Linux` 安装仍见 [`INSTALL.md`](../../INSTALL.md)。
 
-已完成本机 `WSL` 部署后，可直接双击仓库根目录的 `start.cmd`，自动检查并启动前后端、复制本人密钥并打开浏览器。详见[Windows 一键启动说明](one-click-startup.md)。
+这是唯一的本地 `WSL` 部署指南。`WSL` 与原生 `Windows` 使用独立数据目录、依赖和 `Agent` 登录，不同时操作同一份 `hub.db` 或运行记录。启动器不会迁移旧实例，也不复制密钥或登录凭据；原来的 `Windows Codex` 配置可以保留。
 
-这份文档可以独立使用：在本机 `WSL2` 中运行真实后端、命令行 `Agent` 和前端流程操作台。采用前台运行方式，关闭终端后不会作为系统服务自动启动。
+## 准备 `WSL`
 
-## 本机已部署：直接启动
-
-本节对应 `2026-11-13` 在当前电脑完成的部署，首次安装和初始化已经执行。发行版为 `Ubuntu`，用户为 `edy`，后端为 `http://127.0.0.1:3350`。由于 `Windows` 的 `5173` 端口被其他项目占用，本项目前端改为 `http://127.0.0.1:5193`。
-
-打开一个 `PowerShell` 窗口启动后端，保持窗口运行：
-
-```powershell
-wsl -d Ubuntu -u edy -- bash /home/edy/.agent-autoloop-local/start-backend.sh
-```
-
-再打开一个 `PowerShell` 窗口启动前端，保持窗口运行：
-
-```powershell
-wsl -d Ubuntu -u edy -- bash /home/edy/.agent-autoloop-local/start-frontend.sh
-```
-
-在 `Windows` 浏览器打开 `http://127.0.0.1:5193`。如果终端提示已经在跑或端口被占用，先检查本项目是否已经启动，不要重复启动第二份。
-
-读取本人密钥时，另开一个 `PowerShell` 窗口进入 `WSL`：
-
-```powershell
-wsl -d Ubuntu -u edy
-```
-
-进入 `Linux` 提示符后执行：
-
-```bash
-source "$HOME/.agent-autoloop-local/env.sh"
-node --input-type=module -e 'import { readFileSync } from "node:fs"; const c = JSON.parse(readFileSync(process.env.AGENT_AUTOLOOP_HOME + "/config.json", "utf8")); console.log("本人密钥：", c.owner);'
-```
-
-将输出粘贴到网页的“本人密钥”输入框，点击“连接中台”。刷新网页后需要重新连接。
-
-本机使用中转站。两个启动脚本会加载 `/home/edy/.agent-autoloop-local/env.sh`，其中设置 `CODEX_HOME=/mnt/c/Users/EDY/.codex`，沿用已有的中转站配置和本人完成的授权；没有把中转站密钥写入仓库，也无需执行官方账号的浏览器登录。该路径下的配置与运行记录会由两边的 `Codex` 共用，后续不要删除或移动它。
-
-要触发新的真实试跑，在已经加载上述环境的 `WSL` 窗口执行：
-
-```bash
-cd /mnt/d/github/agent-autoloop
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts try
-```
-
-试跑会消耗中转站模型额度。在网页回答卡片后，查看后续轮次是否完成。日常停止按文末“停止和退出”处理。以上脚本用于手动启动，没有注册系统服务或开机自启；本文其他章节保留通用安装步骤，前端端口以本节为准。
-## 启动前准备
-
-- 使用 `Windows 11` 或 `Windows 10 2004`（内部版本 `19041`）及以上版本。尚未安装 `WSL2` 时，先按下面的“第零步”安装。
-- 仓库位于 `D:\github\agent-autoloop`，对应 `WSL2` 路径 `/mnt/d/github/agent-autoloop`。仓库在其他位置时，替换下文的 `cd` 路径。
-- 在 `WSL2` 中准备 `Node.js 24+`、`npm` 和已登录的命令行 `Agent`。第一步包含检查及缺少工具时的安装方法。
-- 准备三个 `WSL2` 终端窗口：窗口一运行后端，窗口二运行前端，窗口三触发试跑或查询状态。
-
-| 配置 | 本文使用的值 |
-| --- | --- |
-| 仓库路径 | `/mnt/d/github/agent-autoloop` |
-| 持久数据目录 | `~/.agent-autoloop-local` |
-| 后端地址 | `http://127.0.0.1:3350` |
-| 前端地址 | 通常为 `http://127.0.0.1:5173`，以启动输出为准 |
-| 默认命令行 `Agent` | `codex`，也可选择 `claude` |
-
-## 第零步：打开并进入 `WSL2`
-
-### 0.1 打开 `Windows PowerShell`
-
-按 `Win+R`，输入 `powershell`，再按回车。看到类似下面的提示符，说明当前还在 `Windows PowerShell`：
-
-```text
-PS C:\Users\EDY>
-```
-
-下文标注“在 `Windows PowerShell` 执行”的命令，就粘贴在这个窗口中。只复制命令代码块里的内容，不要复制示例提示符或代码块的语言名称；每条命令粘贴后按回车，等待完成后再执行下一条。
-
-### 0.2 检查有没有安装 `Linux` 发行版
-
-**在 `Windows PowerShell` 执行：**
-
-```powershell
-wsl --list --verbose
-```
-
-已经安装时，输出类似：
-
-```text
-  NAME      STATE           VERSION
-* Ubuntu    Stopped         2
-```
-
-- `NAME` 是发行版名称。本文以 `Ubuntu` 为例；如果你看到的是 `Ubuntu-24.04` 等名字，将下文所有命令里的 `Ubuntu` 换成这个实际名称。
-- `VERSION` 为 `2`，表示使用 `WSL2`。
-- `Stopped` 表示当前没有运行，执行下一步的进入命令就会启动它。
-- 已有可用的 `WSL2` 发行版，直接跳到 `0.3`，不必重复安装。
-
-如果提示没有安装发行版，或尚未启用 `WSL`：右键开始菜单，选择“终端（管理员）”或“`Windows` `PowerShell`（管理员）”，在管理员窗口执行：
+在管理员 `PowerShell` 中安装或检查：
 
 ```powershell
 wsl --install -d Ubuntu
-```
-
-等待安装完成，按提示重启电脑。重启后从开始菜单打开 `Ubuntu`，按提示创建一个 `Linux` 用户名和密码。这组用户名和密码由你设置，可以与 `Windows` 账号不同；输入密码时不显示字符是正常的。完成后重新执行 `wsl --list --verbose` 检查。
-
-如果已经安装的发行版显示 `VERSION` 为 `1`，先结束其中运行的程序，备份重要文件，再在 `Windows PowerShell` 执行转换，等完成后重新检查：
-
-```powershell
-wsl --set-version Ubuntu 2
 wsl --list --verbose
 ```
 
-### 0.3 进入 `WSL`，作为窗口一
-
-**在 `Windows PowerShell` 执行：**
+明确指定自己的发行版和已有的普通 `Linux` 用户，例如：
 
 ```powershell
-wsl -d Ubuntu
+wsl -d Ubuntu -u <Linux用户名>
 ```
 
-这条命令会启动指定发行版，并把当前窗口切换到它的 `Linux` 命令行。提示符通常会变成类似下面的样子，用户名、电脑名和当前目录可能不同：
-
-```text
-edy@DESKTOP:~$
-```
-
-**接着在这个已经进入 `WSL` 的窗口执行：**
+进入后安装 `Linux Node.js 24+`、`Git`、`curl` 及 `Linux` 版命令行 `Agent`，并在这个用户下单独登录。确认路径不是从 `Windows PATH` 混入的：
 
 ```bash
-uname -s
-cd /mnt/d/github/agent-autoloop
-pwd
-ls
-```
-
-按以下结果核对：
-
-1. `uname -s` 输出 `Linux`，说明已经进入 `WSL`。
-2. `pwd` 输出 `/mnt/d/github/agent-autoloop`，说明已进入项目目录。
-3. `ls` 能看到 `bin`、`frontend`、`docs` 和 `package.json` 等项目内容。
-
-`Windows` 的 `D:\github\agent-autoloop` 在这里写成 `/mnt/d/github/agent-autoloop`：盘符 `D:` 变为 `/mnt/d`，反斜杠变为正斜杠。这里操作的仍是同一份项目文件，无需再次下载仓库。
-
-从现在开始，这个窗口就是“窗口一”。后文标注 `bash` 的命令都在进入 `WSL` 后执行，直接粘贴代码块中的命令即可；不要在 `PS C:\...>` 提示符下执行 `export` 等命令。
-
-### 0.4 后面需要新窗口时怎么打开
-
-需要“窗口二”或“窗口三”时，再按一次 `Win+R`，输入 `powershell` 并回车，在新窗口执行：
-
-```powershell
-wsl -d Ubuntu
-```
-
-等进入 `Linux` 提示符后，再执行对应步骤中的 `bash` 命令。三个窗口都要进入同一个发行版、使用同一个 `Linux` 用户；窗口一、窗口二启动服务后要保持打开，在其他窗口继续操作。
-
-## 第一步：检查环境并安装前端依赖
-
-以下命令都在已经进入 `WSL` 的窗口一执行。
-
-### 1.1 检查 `Node.js` 和 `npm`
-
-```bash
-node --version
-npm --version
 command -v node
-command -v npm
-```
-
-需要 `Node.js 24+`。`node` 和 `npm` 的路径应指向当前 `Linux` 环境，例如 `/home/你的用户名/.nvm/...` 或 `/usr/bin/...`。如果指向 `/mnt/c/...` 中的 `Windows` 安装，或提示 `command not found`，请先在 `WSL` 中安装。
-
-已经有可用的 `Linux` 版 `Node.js 24+` 和 `npm`，跳到 `1.2`。否则，以下安装方法适用于本文的 `Ubuntu`：
-
-```bash
-sudo apt-get update
-sudo apt-get install -y curl ca-certificates git
-curl -fSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.41.0/install.sh -o /tmp/agent-autoloop-nvm-install.sh && bash /tmp/agent-autoloop-nvm-install.sh
-export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-command -v nvm
-nvm install 24
-nvm alias default 24
-nvm use 24
+command -v codex
 node --version
-npm --version
-```
-
-`sudo` 要求输入的是创建 `Ubuntu` 用户时设置的密码，输入时不显示字符。`nvm` 用来在当前 `Linux` 用户下安装和管理 `Node.js`；上面使用固定版本的官方安装脚本。每条命令成功后再执行下一条，遇到下载失败先解决网络问题。
-
-**如果提示 `Command 'nvm' not found`：** 说明当前终端还没加载 `nvm`，或安装没有成功。在当前 `WSL` 窗口先检查：
-
-```bash
-ls -l "$HOME/.nvm/nvm.sh"
-```
-
-如果文件存在，在当前窗口加载并确认：
-
-```bash
-export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-command -v nvm
-```
-
-最后一条应输出 `nvm`，然后再执行 `nvm install 24`。如果提示文件不存在，回到上面的安装命令，从 `sudo apt-get update` 开始执行；下载或安装报错时先解决错误，不要直接继续执行 `nvm install 24`。这里的安装脚本会将加载配置写入用户的 shell 配置；新窗口仍找不到时，可执行 `source ~/.bashrc`，或者重新使用上面的显式加载命令。
-
-不要按终端的相似命令建议安装 `nvme`、`nvim` 等包，它们不是 `nvm`。
-
-### 1.2 检查并登录命令行 `Agent`
-
-本文默认使用 `Codex CLI`。先在当前 `WSL` 窗口使用前一步安装的 `Linux` 版 `Node.js`，再检查命令来自哪里：
-
-```bash
-export NVM_DIR="$HOME/.nvm"
-source "$NVM_DIR/nvm.sh"
-nvm use 24
-command -v node
-command -v npm
-command -v codex
-npm config get prefix
-```
-
-如果上一节使用的是已有的 `Linux` 版 `Node.js` 而没有安装 `nvm`，只执行上面的四条检查命令。`node` 和 `npm` 必须来自 `Linux` 安装。如果 `codex` 指向 `/mnt/d/nodejs/global/...` 或其他 `Windows` 安装，说明当前调用的是另一平台的程序，需要在 `WSL` 单独安装；即使 `node --version` 正常，也不代表 `codex` 的平台正确。
-
-使用本文的 `nvm` 安装方式时，先确认 `nvm use 24` 成功，`command -v node` 和 `command -v npm` 均指向 `/home/你的用户名/.nvm/...`，然后执行：
-
-```bash
-npm install --global --prefix "$NVM_BIN/.." --include=optional @openai/codex@latest
-hash -r
-command -v codex
 codex --version
 ```
 
-`--prefix "$NVM_BIN/.."` 明确将程序安装到当前 `nvm` 版本的 `Linux` 目录，避免沿用指向 `Windows` 的全局安装目录；`--include=optional` 包含当前平台的可选依赖。安装完成后，`command -v codex` 应指向 `/home/你的用户名/.nvm/versions/node/v24.../bin/codex`。以上任一步报错都先停下处理，不要继续初始化项目。
+版本命令只能证明程序可运行，不代表登录完成。仓库可位于 `WSL` 文件系统，或使用 `Windows` 映射路径，例如 `D:\github\agent-autoloop` 对应 `/mnt/d/github/agent-autoloop`。同一份源码可以访问，但不要共用两边安装的 `node_modules`；需要频繁切换时使用独立检出目录。
 
-如果使用其他已确认的 `Linux` 版 `Node.js` 安装方式，先确认 `npm config get prefix` 指向 `Linux` 的安装目录，再按该安装方式的权限要求执行 `npm install --global --include=optional @openai/codex@latest`。
+## 手动安装和启动（以此为准）
 
-**如果报 `Missing optional dependency @openai/codex-linux-x64`，并且错误路径在 `/mnt/d/nodejs/global/...`：** 本文遇到过的是 `WSL` 调用了 `Windows` 安装的 `Codex`。按上面的 `nvm` 检查、指定安装目录、重新安装和 `hash -r` 步骤处理，然后用 `command -v codex` 确认路径已切换。无需往 `Windows` 安装中补装 `Linux` 平台包。若错误路径已经位于 `Linux` 安装目录，仍可先用上面的 `--include=optional` 安装命令重新安装，失败时保留安装过程的完整报错。
-
-如果已经有可用的中转站配置，先设置该配置所在的 `CODEX_HOME` 再检查可用性；不要为中转站配置重复执行官方账号登录。本机沿用配置的方法见本文开头。以下浏览器登录步骤适用于使用官方账号的情况。
-
-然后检查登录状态：
-
-```bash
-codex login status
-```
-
-已经登录就继续。尚未登录时执行下面的命令，由你在浏览器中完成登录：
-
-```bash
-codex login
-```
-
-如果没有自动打开浏览器，可以改用设备码登录，按终端提示在 `Windows` 浏览器打开它给出的地址并输入设备码：
-
-```bash
-codex login --device-auth
-```
-
-完成后重新执行 `codex login status` 确认。不要直接把 `Windows` 的安装或登录状态当作 `WSL` 中已经可用。
-
-若改用已经安装并登录的 `Claude Code`，检查 `claude --version`，并在第二步将 `--agent codex` 换成 `--agent claude`；不必同时安装两种 `Agent`。
-
-### 1.3 安装前端依赖
+以下都在同一个 `Linux` 用户的 `WSL bash` 中执行。示例明确覆盖继承的环境变量，统一使用 `~/.agent-autoloop-local`：
 
 ```bash
 cd /mnt/d/github/agent-autoloop
+export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
+export AGENT_AUTOLOOP_REPO="$PWD"
+sh "$PWD/install.sh" --agent codex --no-service
+```
+
+本地安装器安装**已提交的 `HEAD`**，不包含工作树的未提交修改。自定义数据目录不保证命令已进入 `PATH`，后续统一使用已安装程序的绝对路径：
+
+```bash
+export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
+AUTOLOOP_CLI="$AGENT_AUTOLOOP_HOME/app/bin/agent-autoloop.ts"
+node "$AUTOLOOP_CLI" doctor
+node "$AUTOLOOP_CLI" check
+node "$AUTOLOOP_CLI" up
+```
+
+保持这个终端运行。另开同一发行版、同一用户的 `WSL` 终端启动前端：
+
+```bash
+cd /mnt/d/github/agent-autoloop
+export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
+export AGENT_AUTOLOOP_URL="$(node --input-type=module -e 'import {readFileSync} from "node:fs"; console.log(JSON.parse(readFileSync(process.env.AGENT_AUTOLOOP_HOME+"/config.json","utf8")).url)')"
 npm --prefix frontend ci
+npm --prefix frontend run dev -- --strictPort --port 5193
 ```
 
-这条命令按 `frontend/package-lock.json` 安装前端依赖，首次运行、锁文件更新或切换运行环境后执行；平时启动不用重复安装。只运行本文的前后端，不需要安装根项目的开发依赖。
+`Windows` 浏览器打开 `http://127.0.0.1:5193`。本文手动 `WSL` 启动不启用原生启动器的本机会话网关，仍需在页面输入这个 `Linux` 数据目录 `config.json` 中的本人密钥；仅留在页面内存，不要拿原生实例的密钥混用。断开连接会关闭 `SSE` 并清空页面，不停止后台任务；发送事件仍需独立来源密钥。先停止占用同端口的旧实例，或为新实例配置不同端口。
 
-仓库文件与 `Windows` 共享：如果之前在 `Windows` 中装过前端依赖，现在切换到 `WSL`，要在这里重新执行 `npm --prefix frontend ci`，避免使用另一平台的构建工具依赖。
+## 可选：复用仓库的 `bash` 入口
 
-## 第二步：只在第一次初始化
-
-在已经进入 `WSL` 并完成环境准备的窗口一执行：
+`WSL` 不提供从 `Windows` 自动包装启动的入口；在已选定发行版和用户的 `WSL bash` 内操作。完成初始化和前端依赖安装后，也可手动复用 `scripts/start-wsl.sh`：
 
 ```bash
 cd /mnt/d/github/agent-autoloop
 export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts init --agent codex --port 3350 --no-service
+bash scripts/start-wsl.sh info
+bash scripts/start-wsl.sh backend
 ```
 
-使用 `Claude Code` 时，把 `--agent codex` 换成 `--agent claude`。
-
-这里使用单独的数据目录 `~/.agent-autoloop-local`，不覆盖默认的 `~/.agent-autoloop` 安装。若提示“已经装过了”，不要删除原数据，跳过初始化，直接执行下一步。
-
-## 第三步：启动后端，保留窗口一
-
-继续在窗口一执行：
-
-```bash
-export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts up
-```
-
-看到 `listening on 127.0.0.1:3350`，表示后端已监听。这个进程同时负责中台、接单程序和已配置通道，保持窗口运行。
-
-## 第四步：查看本人密钥并启动前端，保留窗口二
-
-按 `0.4` 的方法新开一个 `PowerShell` 窗口，先执行下面的命令进入同一个发行版，作为窗口二：
-
-```powershell
-wsl -d Ubuntu
-```
-
-等进入 `Linux` 提示符后，在窗口二执行：
+后端保持前台运行，另开同一用户的 `WSL` 终端启动前端：
 
 ```bash
 cd /mnt/d/github/agent-autoloop
 export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --input-type=module -e 'import { readFileSync } from "node:fs"; const c = JSON.parse(readFileSync(process.env.AGENT_AUTOLOOP_HOME + "/config.json", "utf8")); console.log("后端地址：", c.url); console.log("本人密钥：", c.owner);'
-export AGENT_AUTOLOOP_URL="http://127.0.0.1:3350"
-npm --prefix frontend run dev
+bash scripts/start-wsl.sh frontend 5193
 ```
 
-保持窗口二运行，在 `Windows` 的浏览器地址栏中输入前端打印的 `Local` 地址，通常为 `http://127.0.0.1:5173`。这个地址在浏览器里打开，不是粘贴进终端执行。
+显式设置 `Linux` 数据目录，避免继承 `Windows AGENT_AUTOLOOP_HOME` 或 `WSLENV` 中的不适用路径；不把 `D:\...` 传给 `Linux` 进程。脚本未设置数据目录时默认使用 `~/.agent-autoloop-local`；本机如有 `env.sh`，还需核对其中设置。原生 `npm start` 不进入 `WSL`，不要用它代替上述步骤。
 
-在页面的“本人密钥”输入框粘贴窗口二输出的本人密钥，点击“连接中台”。页面通过实时事实订阅更新流程状态。如果你的中台使用其他端口，`AGENT_AUTOLOOP_URL` 必须改成实际后端地址。
+## 项目、并发和配置边界
 
-## 第五步：触发一次真实试跑
+- `WSL` 规则的 `cwd` 使用 `Linux` 路径，如 `/mnt/d/github/project`；原生接单程序的规则使用 `Windows` 路径，不能混用。
+- `WSL Codex` 是 `Linux` 后台进程，不是原生 `Windows Codex`。自己手动开的会话不会自动纳入中台监控；操作台不直播交互终端输出。
+- 容量仍在 `config.json` 的 `worker.capacity`，规则组并发在 `rules.json` 的 `parallel`，不要合成一个配置文件。输出在 `worker/runs/`，不是多个弹出的交互窗口。
+- 独立输出和会话不等于工作树隔离；多个事项共用同一 `cwd` 仍可能修改同一文件。并行写代码时配置独立项目目录或 `Git worktree`，接单程序不会自动隔离，容量限制也不防文件冲突。
+- 登录配置和 `CODEX_HOME` 分开维护。不要为了沿用原生配置复制秘密文件；`Windows` 的既有配置无需删除。
+- 不要把两个环境的接单程序伪装成同一个接单电脑；需要正式多机部署时按[配置手册](../../skills/agent-autoloop/SKILL.md)分别登记。
 
-再开一个 `PowerShell` 窗口，先进入同一个发行版，作为窗口三：
+## 停止与切换
 
-```powershell
-wsl -d Ubuntu
-```
-
-等进入 `Linux` 提示符后，在窗口三执行：
+在对应的 `WSL` 用户下设置同一数据目录，先取消运行中的轮次：
 
 ```bash
-cd /mnt/d/github/agent-autoloop
 export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts try
+AUTOLOOP_CLI="$AGENT_AUTOLOOP_HOME/app/bin/agent-autoloop.ts"
+node "$AUTOLOOP_CLI" stop <轮次编号>
+node "$AUTOLOOP_CLI" status
 ```
 
-这一步会实际调用已配置的 `Agent`，消耗对应模型额度。页面会出现事件、执行轮次和问题卡片，可以在页面回答，也可以按终端提示回答；选一种方式即可。回答后观察新一轮执行，最终查看试跑结果。
+等取消确认、没有 `claimed` 轮次后，在手动启动的前后端终端按 `Ctrl+C` 并等待进程退出。退出中台不等于取消 `Agent`，不要用 `wsl --shutdown` 代替正常收尾。后台启动的实例应先查明自己的进程再停止，不结束其他用户或服务。
 
-需要核对状态时，在试跑结束的窗口三执行；试跑尚未结束时，按 `0.4` 的方法另开窗口并进入同一个发行版，再执行：
+切回原生模式时，先确认旧 `WSL` 接单程序及其 `Agent` 已退出，再在 `Windows` 终端恢复或设置自己的 `AGENT_AUTOLOOP_HOME`，按需重新安装原生前端依赖，在仓库根目录运行 `npm start`（或 `node scripts/start-console.ts`）。两边分别备份，不自动迁移状态。
 
-```bash
-cd /mnt/d/github/agent-autoloop
-export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts status
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts doctor
-```
+`WSL` 桌面通知不会发到 `Windows` 桌面；可用操作台或 `node "$AUTOLOOP_CLI" status` 查看，其他远程通道需单独配置且不得擅自发真消息。
 
-`--no-service` 模式没有安装系统服务，诊断提示服务未安装是正常的。默认桌面通知按配置运行，`WSL2` 通知可能不会显示到 `Windows` 桌面，网页仍可处理卡片。
+## 验证范围
 
-## 以后再次启动
-
-不用重新 `init`，也不必每天重新安装依赖。每次启动仍需要两个窗口，分别运行后端和前端。
-
-**窗口一：** 按 `Win+R` 打开 `powershell`，先进入 `WSL`：
-
-```powershell
-wsl -d Ubuntu
-```
-
-进入后执行：
-
-```bash
-cd /mnt/d/github/agent-autoloop
-export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --disable-warning=ExperimentalWarning bin/agent-autoloop.ts up
-```
-
-**窗口二：** 再按 `Win+R` 打开另一个 `powershell`，先进入 `WSL`：
-
-```powershell
-wsl -d Ubuntu
-```
-
-进入后执行：
-
-```bash
-cd /mnt/d/github/agent-autoloop
-export AGENT_AUTOLOOP_HOME="$HOME/.agent-autoloop-local"
-node --input-type=module -e 'import { readFileSync } from "node:fs"; const c = JSON.parse(readFileSync(process.env.AGENT_AUTOLOOP_HOME + "/config.json", "utf8")); console.log("后端地址：", c.url); console.log("本人密钥：", c.owner);'
-export AGENT_AUTOLOOP_URL="http://127.0.0.1:3350"
-npm --prefix frontend run dev
-```
-
-然后在 `Windows` 浏览器打开窗口二打印的前端地址，粘贴同一窗口刚输出的本人密钥，点击“连接中台”。
-
-## 停止和退出
-
-前端和后端窗口分别按 `Ctrl+C` 可以结束本次前台服务。真实运行的 `Agent` 可能继续执行，后端重启会重新接管；若要停止某一轮，先在网页请求停止并等待执行端确认。
-
-等服务停止、终端重新出现命令提示符后，可以执行下面的命令退出当前 `WSL` 命令行，回到 `PowerShell`：
-
-```bash
-exit
-```
-
-`exit` 只退出当前命令行。日常停止本项目按上面的方式处理即可；`~/.agent-autoloop-local` 是保留运行记录的持久数据目录，下次启动会继续使用。
-
-## 连不上时按顺序检查
-
-| 现象 | 检查方式 |
-| --- | --- |
-| 执行 `export` 提示无法识别 | 当前还在 `PowerShell`；先执行 `wsl -d Ubuntu`，进入 `Linux` 提示符后再执行 |
-| 进入 `WSL` 提示找不到指定发行版 | 在 `PowerShell` 执行 `wsl --list --verbose`，将命令中的 `Ubuntu` 换成实际名称 |
-| `cd` 提示目录不存在 | 确认项目在 `D:\github\agent-autoloop`；在 `WSL` 中使用 `/mnt/d/github/agent-autoloop` |
-| 新窗口提示 `node` 或 `nvm` 不存在 | 确认进入同一发行版、同一用户；在 `WSL` 执行 `source ~/.bashrc` 后重新检查 |
-| 页面打不开 | 窗口二是否仍运行；在浏览器打开它实际打印的前端地址 |
-| 页面能打开，中台连接失败 | 窗口一是否仍运行；`AGENT_AUTOLOOP_URL` 是否与配置中的后端地址一致 |
-| 修改后端地址后没生效 | 在窗口二按 `Ctrl+C`，重新设置 `AGENT_AUTOLOOP_URL` 并启动前端；只刷新网页不会改变代理目标 |
-| 本人密钥无效 | 从 `~/.agent-autoloop-local/config.json` 重新读取 `owner`，不要填来源密钥或演示模式的密钥 |
-| 页面没有业务数据 | 尚未收到匹配事件时为空是正常的；按第五步运行 `try` |
-| 刷新页面后需要重新连接 | 密钥只保存在页面内存中，刷新后重新粘贴本人密钥即可 |
-| 找不到命令行 `Agent` 或未登录 | 在运行后端的同一个 `WSL2` 环境检查命令和登录状态；不要混用 `Windows` 与 `WSL2` 的安装 |
-| 查询到其他实例或提示未初始化 | 每个操作后端的终端都要设置相同的 `AGENT_AUTOLOOP_HOME` |
-| 切换运行环境后前端依赖报错 | 在当前 `WSL2` 环境重新执行 `npm --prefix frontend ci` |
-| 诊断提示系统服务未安装 | 本文使用 `--no-service`，需要手动保持后端窗口运行 |
-
-## 相关说明
-
-- [在 WSL 中打开 Windows 项目并使用 Codex](wsl-windows-project-codex.md)
-
-- [本机部署验收记录](wsl2-deployment-verification.md)
-
-- [前后端启动总览与 Windows 演示模式](frontend-backend-startup.md)
-- [前端配置、构建与静态部署](../../frontend/README.md)
-- [后端安装说明](../../INSTALL.md)
-- [协议及权限](../protocol.md)
-- [架构图](../architecture.svg)
-
-## 官方参考资料
-
-- [Microsoft：安装 WSL](https://learn.microsoft.com/en-us/windows/wsl/install)
-- [Microsoft：WSL 基本命令](https://learn.microsoft.com/en-us/windows/wsl/basic-commands)
-- [Microsoft：设置 Linux 用户名和密码](https://learn.microsoft.com/en-us/windows/wsl/setup/environment#set-up-your-linux-username-and-password)
-- [nvm：官方安装与使用说明](https://github.com/nvm-sh/nvm#installing-and-updating)
-- [OpenAI：Codex CLI](https://developers.openai.com/codex/cli)
-- [npm：全局安装目录说明](https://docs.npmjs.com/cli/v11/configuring-npm/folders/)
-- [OpenAI：Codex CLI 登录命令](https://developers.openai.com/codex/cli/reference#codex-login)
+`doctor`、`check` 和前端连接只能核对当前环境；真实 `node "$AUTOLOOP_CLI" try` 会消耗模型额度，必须另行得到明确授权。备用环境的通过记录不能证明原生 `Windows` 进程树、登录任务、`ACL` 或沙箱正常。本文是操作步骤，不是本次已通过的验收记录。

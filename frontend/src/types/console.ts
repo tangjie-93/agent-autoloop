@@ -93,6 +93,8 @@ export interface Answer {
   choice?: number;
   text?: string;
 }
+export type ConsoleAuth = string | { session: string };
+export type ConnectionMode = "checking" | "local" | "manual" | "error";
 export type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
 export interface ConsoleOptions {
   fetcher?: Fetcher;
@@ -102,9 +104,12 @@ export interface ConsoleOptions {
 export interface ConnectionProps {
   connected: boolean;
   busy: boolean;
+  connecting: boolean;
+  mode: ConnectionMode;
 }
 export interface ConnectionEmits {
-  connect: [key: string];
+  connect: [key?: string];
+  retry: [];
   disconnect: [];
 }
 export interface FlowProps {

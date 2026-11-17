@@ -18,6 +18,97 @@ test("owner and source credentials stay on their respective endpoints; writes ar
     { path: "/v1/events", key: "Bearer source" },
   ]);
 });
+test("local connection uses a revocable session and keeps event source credentials separate", async () => {
+  const calls: { path: string; method: string; session: string | null; auth: string | null }[] = [];
+  const app = useConsole({
+    realtime: false,
+    interval: 100000,
+    fetcher: async (url, init) => {
+      const headers = new Headers(init?.headers);
+      calls.push({
+        path: String(url),
+        method: init?.method ?? "GET",
+        session: headers.get("X-Autoloop-Session"),
+        auth: headers.get("Authorization"),
+      });
+      if (String(url) === "/local-console/session")
+        return Response.json(init?.method === "POST" ? { token: "temporary-session" } : { local: true });
+      return Response.json({ runs: [], cards: [], nextBefore: null, hasMore: false });
+    },
+  });
+  await app.discover();
+  assert.equal(app.mode.value, "local");
+  await app.connect();
+  assert.equal(app.connected.value, true);
+  assert.ok(calls.some((c) => c.path === "/v1/state" && c.session === "temporary-session" && !c.auth));
+  await app.action((client) => client.emit("source-only", { id: "test", type: "test" }), "发送成功");
+  assert.ok(calls.some((c) => c.path === "/v1/events" && c.auth === "Bearer source-only" && !c.session));
+  app.disconnect();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(app.connected.value, false);
+  assert.equal(app.state.value, null);
+  assert.ok(calls.some((c) => c.method === "DELETE" && c.session === "temporary-session"));
+});
+
+test("static deployments retain manual connection while malformed local metadata fails closed", async () => {
+  const staticApp = useConsole({
+    fetcher: async () => new Response("<html>console</html>", { headers: { "content-type": "text/html" } }),
+  });
+  await staticApp.discover();
+  assert.equal(staticApp.mode.value, "manual");
+  staticApp.disconnect();
+  const broken = useConsole({ fetcher: async () => Response.json({ local: "wrong" }) });
+  await broken.discover();
+  assert.equal(broken.mode.value, "error");
+  assert.match(broken.error.value, /响应无效/);
+  broken.disconnect();
+});
+
+test("a failed initial read revokes the local session and leaves connect retryable", async () => {
+  let revoked = 0;
+  const app = useConsole({
+    realtime: false,
+    fetcher: async (url, init) => {
+      if (String(url) === "/local-console/session") {
+        if (init?.method === "DELETE") revoked++;
+        return Response.json(init?.method === "POST" ? { token: "failed-session" } : { local: true });
+      }
+      return Response.json({ error: "中台暂不可用" }, { status: 503 });
+    },
+  });
+  await app.discover();
+  await app.connect();
+  assert.equal(app.connected.value, false);
+  assert.equal(app.connecting.value, false);
+  assert.match(app.error.value, /暂不可用/);
+  assert.equal(revoked, 1);
+  app.disconnect();
+});
+
+test("disconnect during handshake revokes a late token instead of restoring the connection", async () => {
+  let finish!: (response: Response) => void;
+  let revoked = false;
+  const app = useConsole({
+    realtime: false,
+    fetcher: async (_url, init) => {
+      if (init?.method === "POST")
+        return new Promise((resolve) => {
+          finish = resolve;
+        });
+      if (init?.method === "DELETE") revoked = true;
+      return Response.json({ local: true });
+    },
+  });
+  await app.discover();
+  const opening = app.connect();
+  app.disconnect();
+  finish(Response.json({ token: "late-session" }));
+  await opening;
+  assert.equal(app.connected.value, false);
+  assert.equal(app.state.value, null);
+  assert.equal(revoked, true);
+});
+
 test("refresh merges history and accepts latest active state without duplicate rows", () => {
   assert.deepEqual(
     mergeRuns(

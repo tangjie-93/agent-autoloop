@@ -1,12 +1,13 @@
-import type { Answer, EventInput, Fact, Fetcher, HubState, EmittedEvent } from "../types/console.ts";
+import type { Answer, EventInput, Fact, Fetcher, HubState, EmittedEvent, ConsoleAuth } from "../types/console.ts";
+import { authHeaders } from "./session.ts";
 /** Build a same-origin client; credentials only travel in headers. */
-export function createHub(owner: string, fetcher: Fetcher = fetch) {
-  async function request<T>(path: string, key: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+export function createHub(owner: ConsoleAuth, fetcher: Fetcher = fetch) {
+  async function request<T>(path: string, key: ConsoleAuth, body?: unknown, signal?: AbortSignal): Promise<T> {
     const deadline = AbortSignal.timeout(15000);
     const response = await fetcher("/v1" + path, {
       method: body === undefined ? "GET" : "POST",
       headers: {
-        Authorization: "Bearer " + key,
+        ...authHeaders(key),
         ...(body === undefined ? {} : { "Content-Type": "application/json" }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),

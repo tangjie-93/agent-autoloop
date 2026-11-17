@@ -21,6 +21,8 @@ $env:AGENT_AUTOLOOP_REPO = 'C:\code\agent-autoloop'
 & 'C:\code\agent-autoloop\install.ps1' --agent codex --no-service
 ```
 
+自定义 `AGENT_AUTOLOOP_HOME` 的安装不会把命令加入 `PATH`。后续使用安装器打印的完整命令，或 `node "$env:AGENT_AUTOLOOP_HOME\app\bin\agent-autoloop.ts" doctor` 等绝对路径调用；在每个终端设置同一实例的数据目录。原生部署与日常停止步骤见[本地指南](docs/local/windows-native-deployment.md)，切换环境不会自动迁移数据或复制登录凭据。
+
 系统不允许运行本地脚本时，可仅为这一条命令使用 `powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\code\agent-autoloop\install.ps1 --agent codex --no-service`，不修改全局执行策略。安装其他参数与下面的 macOS/Linux 相同。
 
 给 Windows 写带中文的 PowerShell 脚本（比如轮询脚本，或包一层 Agent 的脚本）要存成带 BOM 的 UTF-8：PowerShell 5.1 按本地代码页读不带 BOM 的文件，中文会乱，接着报语法错误。
@@ -57,14 +59,30 @@ AGENT_AUTOLOOP_REPO=/path/to/agent-autoloop sh /path/to/agent-autoloop/install.s
 
 ## 可选：流程操作台
 
-操作台是源码仓库内独立的 `frontend/` 客户端，安装器不会替用户安装前端依赖或启动页面。先启动中台，再在源码仓库根目录运行：
+操作台是源码仓库内独立的 `frontend/` 客户端，安装器不会替用户安装前端依赖或启动页面。
+
+Windows 原生部署先在仓库根目录执行：
+
+```powershell
+npm --prefix frontend ci
+npm start
+```
+
+`npm start` 执行 `scripts/start-console.ts`，也可直接运行 `node scripts/start-console.ts`（`Node 24+`，无新增运行时依赖），用 `npm start -- --help` 查看参数。它用 `node.exe` 直接启动或复用本机中台和 `Vite` 前端，日志及自己启动的进程记录在 `<数据目录>\logs\console`；数据目录默认是 `%USERPROFILE%\.agent-autoloop`，可由同一终端的 `AGENT_AUTOLOOP_HOME` 覆盖。需要手动启动前端时，把 `AGENT_AUTOLOOP_URL` 设为 `config.json` 的 `url` 后运行 `npm --prefix frontend run dev`。完整边界和停止步骤见[原生部署](docs/local/windows-native-deployment.md)。
+
+`macOS` / `Linux` 仍先启动中台，再在源码仓库根目录运行：
 
 ```bash
 npm --prefix frontend ci
-npm --prefix frontend run dev
+# 将示例地址替换为 config.json 的 url。
+AGENT_AUTOLOOP_URL=http://127.0.0.1:7317 npm --prefix frontend run dev
 ```
 
-打开终端打印的本机地址，输入 `config.json` 中的本人密钥（`owner`）。它能读取状态、回答、结案和停止；发送事件要单独输入来源密钥。凭据只留在页面内存中，不写入源码、构建产物或网址，也不自动读取用户配置。
+`WSL` 需要独立的 `Linux` 依赖和数据目录，见[备用方案](docs/local/wsl2-deployment.md)。不要共用另一环境的 `node_modules`。操作台不直播 `Codex` 交互终端，手动打开的会话也不会自动被监控。
+
+使用 `npm start` 的本机页面只需点击“连接中台”，不输入本人密钥（`owner`），启动器也不再复制剪贴板。它设置仅服务端使用的 `AGENT_AUTOLOOP_LOCAL_CONFIG` 配置路径，`owner` 留在 `Vite` 服务端；浏览器仅在内存持有短时随机会话。网关校验回环地址、`Host`、`Origin` 和路由白名单后代为鉴权，不是匿名代理。断开连接会撤销会话、关闭 `SSE` 并清空页面，不停止后台任务。
+
+手动 `npm --prefix frontend run dev`、静态或远程部署仍需输入 `config.json` 中的 `owner`，通过固定代理连接；密钥只留在页面内存，不写入源码、构建产物、网址或持久存储。本人身份能读取状态、回答、结案和停止；发送事件始终要独立的来源密钥，不能用本机会话代替。
 
 地址不同时，启动前设置服务端环境变量 `AGENT_AUTOLOOP_URL`，开发和预览只向该固定目标代理 `/v1`。页面通过 `SSE` 实时事实流更新，不修改规则或另做调度。`npm --prefix frontend run build` 生成 `frontend/dist/`，`npm --prefix frontend run preview` 用于本机预览。正式部署用同源静态服务器和固定反向代理，对外使用 `HTTPS`。完整配置见[操作台说明](frontend/README.md)。中台支持的平台和安装方式不因独立前端改变。
 
@@ -82,7 +100,7 @@ agent-autoloop up
 
 `up` 会一直运行。在 Agent 的命令工具里保留它返回的运行中会话，再用另一条命令完成验证；不要用 `nohup … &` 代替，命令工具可能在退出时清理后台进程。看到监听地址后再运行验证命令；启动失败就先处理该会话里的错误。
 
-PATH 没有命令时，把 `agent-autoloop` 换成安装器打印的完整路径。临时测试使用假的通知程序或通道，Windows 也不要弹真实通知；不要给已在线的飞书应用再开监听。
+自定义 `AGENT_AUTOLOOP_HOME` 时不要假定命令进入 `PATH`；把上面的 `agent-autoloop up` 换成 `node "$AGENT_AUTOLOOP_HOME/app/bin/agent-autoloop.ts" up`，或使用安装器打印的完整命令。其他命令也按同样方式调用。临时测试使用假的通知程序或通道，Windows 也不要弹真实通知；不要给已在线的飞书应用再开监听。
 
 ## 验证
 

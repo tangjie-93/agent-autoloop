@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, watch, nextTick, useTemplateRef, shallowRef, onMounted, onBeforeUnmount } from "vue";
 import { VueFlow, useVueFlow } from "@vue-flow/core";
-import { Plus, Minus, Maximize, Workflow } from "@lucide/vue";
+import { Workflow } from "@lucide/vue";
 import FlowStage from "./FlowStage.vue";
 import { buildWorkflow } from "../workflow";
 import type { WorkflowProps, WorkflowEmits } from "../types/workflow";
@@ -19,7 +19,7 @@ onMounted(() => {
 });
 onBeforeUnmount(() => observer?.disconnect());
 const graph = computed(() => buildWorkflow(props.state, props.run, props.facts, props.live));
-const { zoomIn, zoomOut, fitView, dimensions, onNodesInitialized } = useVueFlow("runtime-flow");
+const { fitView, dimensions, onNodesInitialized } = useVueFlow("runtime-flow");
 function fitCanvas() {
   void nextTick(() => fitView({ padding: 0.12 }));
 }
@@ -42,7 +42,7 @@ function choose(id: string) {
         <Workflow :size="17" /><strong>{{ run ? "轮次 #" + run.id + " 的执行路径" : "中台运行全景" }}</strong
         ><span class="canvas-mode">只读流程</span>
       </div>
-      <span class="canvas-hint">拖动画布 · 滚轮缩放 · 点击节点</span>
+      <span class="canvas-hint">全景自适应 · 点击节点筛选</span>
     </div>
     <div ref="canvasElement" class="flow-canvas">
       <VueFlow
@@ -58,18 +58,16 @@ function choose(id: string) {
         :nodes-connectable="false"
         :edges-updatable="false"
         :zoom-on-double-click="false"
-        :fit-view-params="{ padding: 0.15 }"
+        :zoom-on-scroll="false"
+        :zoom-on-pinch="false"
+        :pan-on-drag="false"
+        :pan-on-scroll="false"
+        :prevent-scrolling="false"
+        :fit-view-params="{ padding: 0.12 }"
         @node-click="choose($event.node.id)"
       >
         <template #node-stage="nodeProps"><FlowStage v-bind="nodeProps" /></template>
       </VueFlow>
-      <div class="canvas-controls" aria-label="画布控制">
-        <button aria-label="放大画布" title="放大" @click="zoomIn()"><Plus :size="16" /></button
-        ><button aria-label="缩小画布" title="缩小" @click="zoomOut()"><Minus :size="16" /></button
-        ><button aria-label="适应全部节点" title="适应画布" @click="fitView({ padding: 0.15 })">
-          <Maximize :size="16" />
-        </button>
-      </div>
       <div v-if="!state" class="canvas-empty"><span>连接中台后，流程将在这里实时展开</span></div>
     </div>
     <div class="canvas-legend">

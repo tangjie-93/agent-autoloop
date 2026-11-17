@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, shallowRef } from "vue";
+import { computed, shallowRef, onMounted } from "vue";
 import { useConsole } from "./hooks/useConsole";
 import { Workflow, Radio, RefreshCw, Settings2, Plus, PanelRight, ListFilter, ChevronRight } from "@lucide/vue";
 import ActivityFeed from "./components/ActivityFeed.vue";
@@ -26,6 +26,9 @@ const {
   detailBusy,
   pending,
   connected,
+  connecting,
+  mode,
+  discover,
   updated,
   hasMore,
   run,
@@ -37,6 +40,7 @@ const {
   loadDetail,
   action,
 } = useConsole();
+onMounted(() => void discover());
 const sessionKey = shallowRef(0);
 function disconnect() {
   sessionKey.value++;
@@ -71,11 +75,11 @@ const metrics = computed(() => [
   { label: "需要你处理", value: state.value?.totals.attention, unit: "张卡片", tone: "orange" },
   { label: "今天已完成", value: state.value?.totals.doneToday, unit: "轮", tone: "" },
 ]);
-async function open(key: string) {
+async function open(key?: string) {
   sessionKey.value++;
   composer.value = false;
   await connect(key);
-  if (!error.value) settings.value = false;
+  if (connected.value && !error.value && mode.value !== "local") settings.value = false;
 }
 function answer(id: number, body: Answer) {
   void action((client) => client.answer(id, body), "回答已提交，事项将继续处理。");
@@ -122,10 +126,41 @@ function send(key: string, event: EventInput) {
           <span><Radio :size="14" /> 实时事实订阅</span><span>上次更新 {{ time(updated) }}</span>
         </div>
       </div>
-      <ConnectionPanel v-if="settings" :connected="connected" :busy="busy" @connect="open" @disconnect="disconnect" />
+      <div class="overview-bar">
+        <ConnectionPanel
+          v-if="settings || mode === 'local'"
+          :connected="connected"
+          :busy="busy"
+          :connecting="connecting"
+          :mode="mode"
+          @connect="open"
+          @disconnect="disconnect"
+          @retry="discover"
+        />
+        <section class="metrics" aria-label="运行概况">
+          <div v-for="metric in metrics" :key="metric.label" class="metric">
+            <span><i :class="metric.tone"></i>{{ metric.label }}</span
+            ><strong
+              >{{ metric.value ?? "—" }}<small>{{ metric.unit }}</small></strong
+            ><span class="metric-caption">{{
+              metric.label === "需要你处理"
+                ? "回答或结案后继续"
+                : metric.label === "正在执行"
+                  ? "接单端正在处理"
+                  : metric.label === "等待执行"
+                    ? "等待可用执行容量"
+                    : "以中台记录为准"
+            }}</span>
+          </div>
+        </section>
+      </div>
       <div v-if="error || streamError" role="alert" class="error-banner">
         <strong>{{ error || streamError }}</strong><span>{{
-          state ? "当前显示上次读取的数据，可能已经过期。流程动画已暂停。" : "请检查中台地址、代理设置和本人密钥。"
+          state
+            ? "当前显示上次读取的数据，可能已经过期。流程动画已暂停。"
+            : mode === "local"
+              ? "请检查本机中台是否运行，再点击连接重试。"
+              : "请检查中台地址、代理设置和本人密钥。"
         }}</span
         ><button :disabled="busy || !connected" @click="refresh">重新读取</button>
       </div>
@@ -137,22 +172,6 @@ function send(key: string, event: EventInput) {
         @send="send"
         @close="composer = false"
       />
-      <section class="metrics" aria-label="运行概况">
-        <div v-for="metric in metrics" :key="metric.label" class="metric">
-          <span><i :class="metric.tone"></i>{{ metric.label }}</span
-          ><strong
-            >{{ metric.value ?? "—" }}<small>{{ metric.unit }}</small></strong
-          ><span class="metric-caption">{{
-            metric.label === "需要你处理"
-              ? "回答或结案后继续"
-              : metric.label === "正在执行"
-                ? "接单端正在处理"
-                : metric.label === "等待执行"
-                  ? "等待可用执行容量"
-                  : "以中台记录为准"
-          }}</span>
-        </div>
-      </section>
       <div class="workspace">
         <RunList
           :runs="runs"

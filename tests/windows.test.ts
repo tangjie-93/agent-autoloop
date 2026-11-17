@@ -3,7 +3,8 @@
 // folder whose name the console code page can't write (a Chinese user name) isn't found, so nothing installs or runs; a
 // powershell.exe an Agent left in the turn's folder runs, outside its sandbox, in place of the system's; the npm.cmd and
 // npx.cmd that npm 10 and later write, which name their script through a variable, can't be run at all; a command line
-// longer than Windows starts fails with only "spawn ENAMETOOLONG", which doesn't say what is too long or what to do.
+// longer than Windows starts fails with only "spawn ENAMETOOLONG", which doesn't say what is too long or what to do;
+// parallel turns share output or cancelling one ends another, and a worker restart loses either running turn.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -107,6 +108,78 @@ setInterval(() => {}, 1000);`,
   } finally {
     cancel = [];
     if (pid) spawnSync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+  }
+});
+
+test("Windows keeps parallel turns isolated across restart and cancellation", { skip: !windows }, async () => {
+  const agent = join(scratch, "parallel.mjs");
+  const first = join(scratch, "project-a");
+  const second = join(scratch, "project-b");
+  mkdirSync(first);
+  mkdirSync(second);
+  writeFileSync(
+    agent,
+    `import {writeFileSync, existsSync} from 'node:fs';
+writeFileSync('started.json', JSON.stringify({pid:process.pid,cwd:process.cwd()}));
+console.log(process.cwd());
+const timer=setInterval(()=>{if(existsSync('finish')){clearInterval(timer);console.log('finished '+process.cwd());}},50);`,
+  );
+  const a = job(20, [process.execPath, agent]);
+  const b = job(21, [process.execPath, agent]);
+  a.rule.cwd = first;
+  b.rule.cwd = second;
+  waiting.push(a, b);
+  const running = worker();
+  const pids: number[] = [];
+  try {
+    await running.tick();
+    await running.tick();
+    await until(() => existsSync(join(first, "started.json")) && existsSync(join(second, "started.json")));
+    for (const folder of [first, second]) pids.push(JSON.parse(readFileSync(join(folder, "started.json"), "utf8")).pid);
+    assert.notEqual(pids[0], pids[1]);
+    const resumed = worker();
+    await resumed.tick();
+    assert.ok(!results.has(20) && !results.has(21), "running turns were mistaken for completed turns");
+    cancel = [20];
+    await until(
+      () => results.has(20),
+      () => resumed.tick(),
+    );
+    assert.equal(results.get(20).outcome, "cancelled");
+    assert.throws(() => process.kill(pids[0], 0), { code: "ESRCH" });
+    assert.doesNotThrow(() => process.kill(pids[1], 0));
+    assert.ok(!results.has(21));
+    writeFileSync(join(second, "finish"), "");
+    await until(
+      () => results.has(21),
+      () => resumed.tick(),
+    );
+    assert.equal(results.get(21).outcome, "done");
+    const runs = join(process.env.AGENT_AUTOLOOP_HOME!, "worker/runs");
+    assert.equal(readFileSync(join(runs, "20-1/stdout-1.log"), "utf8").trim(), first);
+    assert.match(readFileSync(join(runs, "21-1/stdout-1.log"), "utf8"), /finished/);
+  } finally {
+    cancel = [];
+    for (const folder of [first, second]) {
+      const file = join(folder, "started.json");
+      if (existsSync(file)) pids.push(JSON.parse(readFileSync(file, "utf8")).pid);
+    }
+    for (const pid of new Set(pids)) {
+      try {
+        process.kill(pid, 0);
+      } catch {
+        continue;
+      }
+      spawnSync("taskkill.exe", ["/PID", String(pid), "/T", "/F"], { stdio: "ignore" });
+    }
+    // Cancel any supervisor left by an assertion before removing its run directory.
+    cancel = [20, 21];
+    const cleanup = worker();
+    await until(
+      () => results.has(20) && results.has(21),
+      () => cleanup.tick(),
+    );
+    cancel = [];
   }
 });
 
