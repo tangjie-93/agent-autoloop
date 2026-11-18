@@ -1156,11 +1156,35 @@ h1 {
   color: #217452;
 }
 .composer {
+  width: min(760px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   background: white;
+  color: inherit;
   border: 1px solid #dfe1f7;
-  border-radius: 8px;
-  padding: 18px 21px;
-  margin-bottom: 18px;
+  border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: 0 24px 80px #20263530;
+}
+.composer::backdrop {
+  background: #20263566;
+}
+.composer-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+.composer-feedback {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #f5f6fa;
+  font-size: 13px;
+  overflow-wrap: anywhere;
 }
 .composer h2 {
   font-size: 14px;
