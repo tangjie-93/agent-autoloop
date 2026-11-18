@@ -1,9 +1,9 @@
-// Native console launcher: node scripts/start-console.ts (or npm start), with Node 24+.
-// Prepare config.json and frontend dependencies first; this script never installs, initializes or migrates data.
-// Order matters: validate configuration -> reuse/start the hub -> reuse/start Vite -> verify its authenticated proxy
-// -> optionally open the browser. Local sessions keep the owner key server-side; clipboard copying is no longer needed.
-// Services deliberately outlive this launcher. Cancel Agent runs through the CLI/console before stopping the hub;
-// closing this script or the browser does not stop detached workers or their Agents.
+// 本机操作台的原生启动器：node scripts/start-console.ts（或 npm start），需要 Node 24 及以上。
+// 运行前先准备好 config.json 和前端依赖；本脚本不安装、不初始化、不迁移数据。
+// 顺序有讲究：校验配置 -> 复用或启动中台 -> 复用或启动 Vite -> 验证带鉴权的本机代理 -> 按需打开浏览器。
+// 本机会话把主人密钥留在服务端，不再需要复制到剪贴板。
+// 服务会脱离启动器继续运行：停中台前先在命令行或操作台里取消 Agent 的轮次；
+// 关掉本脚本或浏览器不会停掉已分离的接单程序及其 Agent。
 import { spawn, type ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from "node:fs";
@@ -25,19 +25,19 @@ const HELP = `用法：npm start -- [选项]
 数据目录由 AGENT_AUTOLOOP_HOME 指定，默认 ~/.agent-autoloop。
 需要先初始化本机中台，并执行 npm --prefix frontend ci。`;
 
-// Resolve source paths from this file, not the caller's cwd (npm, an IDE and a terminal may use different folders).
-// Data lives separately so a new source checkout can reuse an existing installation without copying keys.
+// 路径以本文件为基准，而不是调用者的当前目录：npm、IDE 和终端可能在不同文件夹里启动。
+// 数据目录单独存放，新检出的源码可以直接复用已有安装，不必复制密钥。
 const repo = path.resolve(import.meta.dirname, "..");
 const home = path.resolve(process.env.AGENT_AUTOLOOP_HOME ?? path.join(homedir(), ".agent-autoloop"));
 const logs = path.join(home, "logs", "console");
 
-/** A listening port is not proof of identity; authenticated state is required before reusing a hub or its proxy. */
+/** 端口在监听不等于对端就是中台；复用中台或其代理之前，必须先用鉴权请求确认身份。 */
 async function hubReady(url: string, owner: string) {
   try {
     const response = await fetch(`${url.replace(/\/$/, "")}/v1/state`, {
       headers: { Authorization: `Bearer ${owner}` },
       signal: AbortSignal.timeout(3_000),
-      // Never forward the owner key to a redirected server.
+      // 绝不把主人密钥转发给重定向后的服务器。
       redirect: "error",
     });
     if (response.status !== 200) {
@@ -51,7 +51,7 @@ async function hubReady(url: string, owner: string) {
   }
 }
 
-/** A different local app may already own this port; its HTML must never count as our console. */
+/** 本机别的应用可能已经占着这个端口；它的页面绝不能被当成我们的操作台。 */
 async function consoleReady(url: string) {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(3_000), redirect: "error" });
@@ -62,7 +62,7 @@ async function consoleReady(url: string) {
   }
 }
 
-/** A failed identity check plus an occupied port is an error, not permission to kill its owner. */
+/** 身份校验失败又遇到端口被占，这是要报的错，不是去杀掉占用者的许可。 */
 async function occupied(port: number, host = "127.0.0.1") {
   return new Promise<boolean>((resolve) => {
     const socket = createConnection({ port, host });
@@ -78,9 +78,9 @@ async function occupied(port: number, host = "127.0.0.1") {
 }
 
 /**
- * Start native Node directly: shell/npm wrappers would reinterpret quotes, spaces or metacharacters in paths.
- * All stdio uses files, not pipes to this launcher. detached + unref lets services survive the launcher exiting.
- * Only newly spawned services get PID records; reusing a service must not overwrite ownership hints or its logs.
+ * 直接启动原生 Node：经过 shell 或 npm 包装层会重新解释路径里的引号、空格和元字符。
+ * 所有标准输入输出都走文件，不接回启动器的管道。detached + unref 让服务在启动器退出后继续运行。
+ * 只有这次新起的服务才写 PID 记录；复用已有服务时不能覆盖它的归属提示或日志。
  */
 async function start(name: string, args: string[], cwd: string, env: NodeJS.ProcessEnv) {
   const output = openSync(path.join(logs, `${name}.log`), "a", 0o600);
@@ -94,7 +94,7 @@ async function start(name: string, args: string[], cwd: string, env: NodeJS.Proc
         windowsHide: true,
         stdio: ["ignore", output, errors],
       });
-      // 'spawn' confirms a valid PID; once() rejects on 'error', unlike assuming spawn() always succeeds.
+      // 'spawn' 事件才能确认拿到了有效 PID；不能假设 spawn() 调用成功就一定会起来。
       await once(child, "spawn");
       child.unref();
       writeFileSync(path.join(logs, `${name}.pid`), String(child.pid), { mode: 0o600 });
@@ -107,7 +107,7 @@ async function start(name: string, args: string[], cwd: string, env: NodeJS.Proc
   }
 }
 
-/** Wait only for this new process; fail early on exit and leave diagnostic logs instead of starting duplicates. */
+/** 只等这一个新进程；它提前退出就马上失败并留下诊断日志，而不是再起一份重复的服务。 */
 async function ready(child: ChildProcess, check: () => Promise<boolean>, name: string) {
   const end = Date.now() + 45_000;
   do {
@@ -118,6 +118,10 @@ async function ready(child: ChildProcess, check: () => Promise<boolean>, name: s
   throw new Error(`${name} 在限定时间内没有就绪，请查看日志：${logs}`);
 }
 
+/**
+ * 校验请求和本地文件，复用或启动中台与 Vite，并在打开页面前证明浏览器用的本机会话确实可用。
+ * 只补缺的服务：复用到的中台和前端不会被停止，失败时也不去动它们。
+ */
 async function main() {
   let values;
   try {
@@ -147,6 +151,7 @@ async function main() {
   const config = JSON.parse(readFileSync(configFile, "utf8"));
   if (typeof config.url !== "string" || typeof config.owner !== "string" || !config.owner || !config.hub)
     throw new Error(`中台配置不完整，需要本机 Hub 和本人密钥：${configFile}`);
+  // 启动器会把 config.json 里的主人密钥交给这个地址，所以只接受本机回环 HTTP，不跟着别的地址或内嵌凭据走。
   const backend = new URL(config.url);
   if (
     backend.protocol !== "http:" ||
@@ -161,9 +166,10 @@ async function main() {
   const vite = path.join(frontendDir, "node_modules/vite/bin/vite.js");
   if (!existsSync(vite)) throw new Error("缺少前端依赖，请在当前环境执行 npm --prefix frontend ci。");
   mkdirSync(logs, { recursive: true, mode: 0o700 });
-  // Each child gets an explicit environment; do not mutate the launcher's environment while spawning services.
+  // 每个子进程都拿到显式环境；启动器自己的环境在派生服务期间不做修改。
   const env = { ...process.env, AGENT_AUTOLOOP_HOME: home, AGENT_AUTOLOOP_URL: config.url };
 
+  // 中台：能鉴权通过就复用，否则确认端口空闲后再启动，绝不抢占别人的端口。
   if (await hubReady(config.url, config.owner)) console.log("复用已运行的中台。");
   else {
     if (await occupied(Number(backend.port || 80), backend.hostname.replace(/^\[|\]$/g, "")))
@@ -177,6 +183,7 @@ async function main() {
     );
     await ready(child, () => hubReady(config.url, config.owner), "中台");
   }
+  // 前端同理：能认出口径一致的页面就复用，否则确认端口空闲后再起 Vite。
   if (await consoleReady(frontend)) console.log("复用已运行的前端。");
   else {
     if (await occupied(port)) throw new Error(`前端端口 ${port} 已被占用或页面验证失败；没有停止任何已有进程。`);
@@ -185,13 +192,13 @@ async function main() {
       "frontend",
       [vite, "--host", "127.0.0.1", "--strictPort", "--port", String(port)],
       frontendDir,
-      // Opt in only this frontend child; the path is not a credential and must never be a VITE_* client variable.
+      // 只给这个前端子进程开这个变量；路径不是凭据，也绝不能写成 VITE_* 客户端变量。
       { ...env, AGENT_AUTOLOOP_LOCAL_CONFIG: configFile },
     );
     await ready(child, () => consoleReady(frontend), "前端");
   }
-  // Verify the same short-lived session contract the browser uses, not a hidden manual-key fallback.
-  // An old/manual Vite process may serve the right HTML but cannot support the new single-button connection.
+  // 这里验证的是浏览器实际要用的短时本机会话，而不是一条隐藏的手动密钥通道。
+  // 旧版或手动起的 Vite 可能返回正确页面，却撑不起新的单按钮连接。
   const endpoint = `${frontend}/local-console/session`;
   const request = (init: RequestInit = {}) =>
     fetch(endpoint, { ...init, signal: AbortSignal.timeout(3000), redirect: "error" });
@@ -200,6 +207,7 @@ async function main() {
     const metadata = await request();
     if (!metadata.ok) throw new Error("没有本机连接接口");
     const mode = await metadata.json();
+    // 前端连的必须是当前这份配置里的中台；端口一致不代表身份一致。
     if (mode.local !== true || new URL(mode.backend).href !== backend.href) throw new Error("前端配置与当前中台不一致");
     const response = await request({
       method: "POST",
@@ -210,6 +218,7 @@ async function main() {
     const session = await response.json();
     if (typeof session.token !== "string" || !session.token) throw new Error("本机会话无效");
     token = session.token;
+    // 真的用会话令牌走一次代理请求，确认浏览器看到的正是这个中台的状态。
     const state = await fetch(`${frontend}/v1/state`, {
       headers: { "X-Autoloop-Session": session.token as string },
       signal: AbortSignal.timeout(3000),
@@ -221,6 +230,7 @@ async function main() {
   } catch {
     throw new Error(`前端不支持本机连接或未连到当前中台，请核对配置并重启本实例前端。日志：${logs}`);
   } finally {
+    // 验证用的短时会话用完就撤销，不留在服务端。
     if (token)
       await request({
         method: "DELETE",
@@ -229,7 +239,7 @@ async function main() {
         .then((r) => r.body?.cancel())
         .catch(() => {});
   }
-  // Partial startup failures never stop the hub: its worker may already have accepted work.
+  // 启动过程中途失败也绝不顺手停掉中台：它的接单程序可能已经领了活。
   if (process.platform === "win32" && !values["no-browser"]) powershell(`Start-Process ${psQuote(frontend)}`);
   console.log(`前后端已就绪：${frontend}\n日志和新启动进程的 PID：${logs}`);
 }
