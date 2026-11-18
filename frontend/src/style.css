@@ -1276,12 +1276,20 @@ footer > span:last-child {
     max-height: none;
     overflow: visible;
   }
-  .canvas-column,
+  .canvas-column {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 27%);
+    gap: 14px;
+  }
+  .canvas-column > * {
+    min-width: 0;
+  }
+  .canvas-column .canvas-hint {
+    display: none;
+  }
   .flow-panel {
     display: flex;
     flex-direction: column;
-  }
-  .flow-panel {
     flex: 1;
     min-height: 0;
   }
@@ -1296,10 +1304,23 @@ footer > span:last-child {
     height: auto;
   }
   .activity-feed {
-    flex-shrink: 1;
-    min-height: 70px;
-    max-height: 22%;
+    min-height: 0;
+    margin-top: 0;
     overflow: auto;
+    overscroll-behavior: contain;
+  }
+  .activity-feed .section-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .activity-list li {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .activity-list time {
+    width: 100%;
+    padding-left: 11px;
   }
   .content-scroll > footer {
     display: grid;

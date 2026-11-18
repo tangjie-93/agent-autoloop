@@ -1,4 +1,4 @@
-// Failure: the connection panel wastes a full row and wheel gestures hide parts of the overview.
+// Failure: overview wastes vertical space, activity overlaps the graph, or wheel gestures hide nodes.
 async (page) => {
   await page.route('**/local-console/session', (route) => route.fulfill({ status: 200, json: { local: false } }));
   await page.setViewportSize({ width: 1920, height: 1080 });
@@ -12,6 +12,12 @@ async (page) => {
   if (Math.abs(connection.y - metrics.y) > 1) throw new Error('Connection and metrics are not in one row');
   if (connection.x + connection.width > metrics.x) throw new Error('Connection overlaps metrics');
 
+  const flow = await page.locator('.flow-panel').boundingBox();
+  const activity = await page.locator('.activity-feed').boundingBox();
+  if (flow.x + flow.width > activity.x) throw new Error('Activity is not to the right of the overview');
+  if (Math.abs(flow.y - activity.y) > 1 || Math.abs(flow.height - activity.height) > 1) throw new Error('Overview and activity are not aligned');
+  if (flow.width <= activity.width) throw new Error('Overview no longer has the wider column');
+
   const viewport = page.locator('.vue-flow__transformationpane');
   await page.locator('.vue-flow__node').first().waitFor();
   await page.waitForFunction(() => {
@@ -20,6 +26,15 @@ async (page) => {
       const box = node.getBoundingClientRect();
       return box.width > 0 && box.left >= canvas.left && box.right <= canvas.right && box.top >= canvas.top && box.bottom <= canvas.bottom;
     });
+  });
+  await page.waitForFunction(() => {
+    const canvas = document.querySelector('.flow-canvas').getBoundingClientRect();
+    const boxes = [...document.querySelectorAll('.vue-flow__node')].map((node) => node.getBoundingClientRect());
+    const topRow = boxes.find((box) => box.top === Math.min(...boxes.map((item) => item.top)));
+    const bottomRow = boxes.find((box) => box.top === Math.max(...boxes.map((item) => item.top)));
+    return topRow.top - canvas.top < 80
+      && canvas.bottom - bottomRow.bottom < 80
+      && topRow.height + bottomRow.height > canvas.height * 0.65;
   });
   const transform = await viewport.evaluate((element) => element.style.transform);
   await page.locator('.flow-canvas').hover();
@@ -44,6 +59,9 @@ async (page) => {
       return box.left >= canvas.left && box.right <= canvas.right && box.top >= canvas.top && box.bottom <= canvas.bottom;
     });
   });
+  const mobileFlow = await page.locator('.flow-panel').boundingBox();
+  const mobileActivity = await page.locator('.activity-feed').boundingBox();
+  if (mobileActivity.y < mobileFlow.y + mobileFlow.height) throw new Error('Mobile activity is not below the overview');
   await page.unroute('**/local-console/session');
   console.log('OVERVIEW_LAYOUT_PASSED');
 }
