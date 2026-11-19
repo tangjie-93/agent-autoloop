@@ -112,7 +112,17 @@ function send(key: string, event: EventInput) {
         <button :disabled="!connected || busy" @click="refresh">
           <RefreshCw :size="15" :class="{ spin: busy }" /><span>刷新</span>
         </button>
-        <button class="primary" :disabled="!state" @click="composer = !composer"><Plus :size="16" />发送事件</button>
+        <button
+          class="primary"
+          :disabled="!state"
+          aria-haspopup="dialog"
+          @click="
+            message = '';
+            composer = true;
+          "
+        >
+          <Plus :size="16" />发送事件
+        </button>
       </div>
     </header>
     <main>
@@ -168,6 +178,7 @@ function send(key: string, event: EventInput) {
           :key="'event-' + sessionKey"
           v-if="composer && connected"
           :pending="pending"
+          :message="message"
           @send="send"
           @close="composer = false"
         />

@@ -18,10 +18,22 @@ onMounted(() => {
   if (canvasElement.value) observer.observe(canvasElement.value);
 });
 onBeforeUnmount(() => observer?.disconnect());
-const graph = computed(() => buildWorkflow(props.state, props.run, props.facts, props.live));
+const fitPadding = { top: "60px", bottom: "32px", x: "24px" } as const;
+const stageHeight = computed(() => {
+  const { width, height } = canvasSize.value;
+  // Four 235px cards and three 55px gaps span 1105px; reserve room for the banner and connectors.
+  return width > 48 ? Math.max(170, ((1105 * (height - 92)) / (width - 48) - 94) / 2) : 170;
+});
+const graph = computed(() => {
+  const workflow = buildWorkflow(props.state, props.run, props.facts, props.live);
+  for (const node of workflow.nodes) {
+    if (node.position.y === 300) node.position.y = 50 + stageHeight.value + 94;
+  }
+  return workflow;
+});
 const { fitView, dimensions, onNodesInitialized } = useVueFlow("runtime-flow");
 function fitCanvas() {
-  void nextTick(() => fitView({ padding: 0.2 }));
+  void nextTick(() => fitView({ padding: fitPadding }));
 }
 onNodesInitialized(fitCanvas);
 watch(
@@ -44,7 +56,7 @@ function choose(id: string) {
       </div>
       <span class="canvas-hint">全景自适应 · 点击节点筛选</span>
     </div>
-    <div ref="canvasElement" class="flow-canvas">
+    <div ref="canvasElement" class="flow-canvas" :style="{ '--stage-height': stageHeight + 'px' }">
       <VueFlow
         id="runtime-flow"
         v-if="canvasSize.width && canvasSize.height"
@@ -64,7 +76,7 @@ function choose(id: string) {
         :pan-on-drag="false"
         :pan-on-scroll="false"
         :prevent-scrolling="false"
-        :fit-view-params="{ padding: 0.2 }"
+        :fit-view-params="{ padding: fitPadding }"
         @node-click="choose($event.node.id)"
       >
         <template #node-stage="nodeProps"><FlowStage v-bind="nodeProps" /></template>
@@ -84,3 +96,16 @@ function choose(id: string) {
     </div>
   </section>
 </template>
+<style scoped>
+.flow-canvas :deep(.stage) {
+  min-height: var(--stage-height);
+  display: flex;
+  flex-direction: column;
+}
+.flow-canvas :deep(.stage__top) {
+  margin-bottom: auto;
+}
+.flow-canvas :deep(.stage__caption) {
+  margin-bottom: auto;
+}
+</style>

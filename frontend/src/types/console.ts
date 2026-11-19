@@ -151,6 +151,7 @@ export interface InboxEmits {
 }
 export interface EventComposerProps {
   pending: boolean;
+  message: string;
 }
 export interface EventComposerEmits {
   send: [key: string, event: EventInput];
